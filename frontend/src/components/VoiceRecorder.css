@@ -1,0 +1,223 @@
+ .voice-recorder-container {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.recorder-header {
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #dbeafe;
+  padding-bottom: 16px;
+}
+
+.recorder-header h2 {
+  color: #1e40af;
+  margin: 0;
+  font-size: 24px;
+}
+
+.selected-patient-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.patient-badge {
+  background: #3b82f6;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.no-patient-selected {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 2px dashed #93c5fd;
+  border-radius: 12px;
+  padding: 60px 20px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 16px;
+}
+
+.recorder-controls {
+  display: flex;
+  justify-content: center;
+  margin: 32px 0;
+}
+
+.record-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 20px 48px;
+  border-radius: 50px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+.record-btn:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.record-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.record-btn.recording {
+  background: #ef4444;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 24px rgba(239, 68, 68, 0.6);
+  }
+}
+
+.pulse-dot {
+  width: 12px;
+  height: 12px;
+  background: white;
+  border-radius: 50%;
+  animation: blink 1.5s infinite;
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.mic-icon {
+  font-size: 24px;
+}
+
+.status-message {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 2px solid #93c5fd;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.status-message p {
+  color: #1e40af;
+  margin: 0;
+  font-weight: 500;
+}
+
+.transcription-box {
+  background: white;
+  border: 2px solid #93c5fd;
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.transcription-box h3 {
+  color: #1e40af;
+  margin: 0 0 12px 0;
+  font-size: 18px;
+}
+
+.transcription-box p {
+  color: #374151;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.structured-data-box {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 2px solid #86efac;
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.structured-data-box h3 {
+  color: #166534;
+  margin: 0 0 12px 0;
+  font-size: 18px;
+}
+
+.structured-data-box pre {
+  background: white;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+  color: #374151;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 16px 0;
+}
+
+.save-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  width: 100%;
+}
+
+.save-btn:hover {
+  background: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.instructions {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #fcd34d;
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 24px;
+}
+
+.instructions h3 {
+  color: #92400e;
+  margin: 0 0 12px 0;
+  font-size: 18px;
+}
+
+.instructions ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #78350f;
+}
+
+.instructions li {
+  margin: 8px 0;
+  line-height: 1.5;
+} 
+
+
