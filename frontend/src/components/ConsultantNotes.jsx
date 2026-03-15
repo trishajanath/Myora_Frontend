@@ -15,7 +15,7 @@ export default function ConsultantNotes({ selectedPatient }) {
     files.forEach((f) => formData.append("files", f)); // ✅ only files
 
     const res = await axios.post(
-      "http://localhost:5000/api/consultant/extract_notes",
+      "http://localhost:5001/api/consultant/extract_notes",
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
@@ -30,7 +30,7 @@ export default function ConsultantNotes({ selectedPatient }) {
 
     setSaving(true);
 
-    await axios.post("http://localhost:5000/api/consultant/save_notes", {
+    await axios.post("http://localhost:5001/api/consultant/save_notes", {
       patient_id: selectedPatient.id,    // ✅ store correctly
       extracted_json: structured,                 // ✅ rename key
     });

@@ -229,7 +229,7 @@ collection = db["extracted_notes"]
 
 # ---------------- Gemini Setup ----------------
 genai.configure(api_key=Config.GEMINI_API_KEY)
-GEMINI_MODEL = genai.GenerativeModel("gemini-2.5-flash")
+GEMINI_MODEL = genai.GenerativeModel("gemini-2.0-flash")
 
 # ---------------- Helper Functions ----------------
 def clean_json_response(response_text: str):
@@ -256,52 +256,43 @@ def clean_json_response(response_text: str):
 
 
 def extract_medical_notes_from_image(img: Image.Image):
-    """Extract structured consultant notes from a single image using Gemini."""
+    """Extract structured data from any medical document image using Gemini."""
 
     prompt = """
-You are a medical data extraction expert. Analyze this CONSULTANT NOTES table and extract ALL information.
+You are a medical data extraction expert. Analyze this medical document image and extract ALL visible information.
 
- **TABLE STRUCTURE:**
- This table has these columns:
- - "No. of DAYS" (shows DAY 1, DAY 2, DAY 3, DAY 4)
- - "Date:" field at the start of each row
- - "CONSULTANT NOTES" (main column with handwritten doctor's notes)
- - "INV." (Investigations column)
- - "PLAN" (Plan column)
-
- **INSTRUCTIONS:**
- 1. Extract data for EACH DAY visible in the table (DAY 1, DAY 2, DAY 3, DAY 4)
- 2. For each day, extract:
-   - Day number
-    - Date (if written in Date: field)
-   - Everything written in CONSULTANT NOTES column
-- Everything written in INV. column  
-- Everything written in PLAN column
-3. This is doctor's handwriting - make your BEST effort to read it and try to replace it with respect to the surrounding context words if found wrong 
-4. If uncertain about a word, add [check] after it
-5. DO NOT skip illegible text - try to read it and mark uncertain words
+**INSTRUCTIONS:**
+1. Identify the document type (e.g. OPD Summary, Consultant Notes, Prescription, Lab Report, Discharge Summary, etc.)
+2. Extract every field, section, and value visible in the document
+3. For handwritten text, make your best effort to read it; mark uncertain words with [check]
+4. Do NOT skip any section - extract everything
 
 **OUTPUT FORMAT:**
- Return ONLY valid JSON in this exact format:
- {
-   "days": [
-     {
-       "day_number": 1,
-       "date": "date as written or null",
-       "consultant_notes": "everything from consultant notes column",
-       "investigations": "everything from INV column or null",
-       "plan": "everything from PLAN column or null"
-     },
-     {
-       "day_number": 2,
-       "date": "date as written or null",
-       "consultant_notes": "everything from consultant notes column",
-       "investigations": "everything from INV column or null",
-       "plan": "everything from PLAN column or null"
-     }
-   ]
- }
- Extract ALL days now. Return ONLY the JSON, no explanations.
+Return ONLY valid JSON with this structure (adapt sections to match whatever is in the document):
+{
+  "document_type": "type of document",
+  "patient_info": {
+    "name": "patient name or null",
+    "age": "age or null",
+    "sex": "sex or null",
+    "mr_no": "MR/patient ID or null",
+    "date": "document date or null",
+    "doctor": "doctor name or null",
+    "hospital": "hospital name or null"
+  },
+  "sections": [
+    {
+      "title": "section heading (e.g. HISTORY, EXAMINATION, DIAGNOSIS, PRESCRIPTION, etc.)",
+      "content": "all text content in this section as a string"
+    }
+  ],
+  "investigations": "any investigations/tests mentioned or null",
+  "diagnosis": "diagnosis if present or null",
+  "prescription": "medications/treatment if present or null",
+  "notes": "any additional notes or null"
+}
+
+Return ONLY the JSON. No explanations.
 """
 
     try:
@@ -314,12 +305,12 @@ You are a medical data extraction expert. Analyze this CONSULTANT NOTES table an
         )
 
         if not response or not response.text:
-            return {"days": []}
+            return {"document_type": "unknown", "sections": [], "error": "No response from model"}
 
         cleaned_json = clean_json_response(response.text)
 
         if not cleaned_json:
-            return {"days": []}
+            return {"document_type": "unknown", "sections": [], "raw_text": response.text}
 
         return json.loads(cleaned_json)
 
@@ -327,27 +318,25 @@ You are a medical data extraction expert. Analyze this CONSULTANT NOTES table an
         print("❌ Gemini extraction failed:", e)
         import traceback
         traceback.print_exc()
-        return {"days": []}
+        return {"document_type": "unknown", "sections": [], "error": str(e)}
 
 
 
 def merge_day_data(existing_data, new_data):
-    """Merge day-wise consultant notes from multiple images."""
-    day_map = {d["day_number"]: d for d in existing_data.get("days", [])}
+    """Merge extracted data from multiple images."""
+    if not existing_data.get("sections") and not existing_data.get("document_type"):
+        return new_data
 
-    for day in new_data.get("days", []):
-        day_num = day.get("day_number")
-        if not day_num:
-            continue
+    existing_sections = existing_data.get("sections", [])
+    new_sections = new_data.get("sections", [])
 
-        if day_num not in day_map:
-            day_map[day_num] = day
-        else:
-            for key, value in day.items():
-                if value and not day_map[day_num].get(key):
-                    day_map[day_num][key] = value
+    existing_titles = {s["title"] for s in existing_sections}
+    for section in new_sections:
+        if section["title"] not in existing_titles:
+            existing_sections.append(section)
 
-    return {"days": list(day_map.values())}
+    existing_data["sections"] = existing_sections
+    return existing_data
 
 
 # ---------------- Routes ----------------
@@ -362,7 +351,7 @@ def extract_notes():
             return jsonify({"error": "At least one image file is required"}), 400
 
         images = request.files.getlist("files")
-        all_extracted_data = {"days": []}
+        all_extracted_data = {}
 
         for img_file in images:
             img = Image.open(img_file.stream)
