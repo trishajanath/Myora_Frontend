@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 import google.generativeai as genai
 from config import Config
 from db import emr_collection
+from audit import log_audit, AuditAction
 from datetime import datetime
 import json
 import re
@@ -11,14 +12,14 @@ voice_bp = Blueprint('voice', __name__)
 
 # Initialize clients
 genai.configure(api_key=Config.GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 deepgram = DeepgramClient(Config.DEEPGRAM_API_KEY)
 
 # -----------------------------
 # 🎤 AUDIO TRANSCRIPTION ROUTE
 # -----------------------------
 @voice_bp.route('/transcribe', methods=['POST'])
-async def transcribe_audio():
+def transcribe_audio():
     """Transcribe audio using Deepgram."""
     try:
         # Ensure audio file is sent
@@ -31,13 +32,33 @@ async def transcribe_audio():
         # Read audio file bytes
         audio_bytes = audio_file.read()
 
-        # Create source object for Deepgram
-        source = {"buffer": audio_bytes, "mimetype": "audio/wav"}  # or audio/webm
+        # Detect mimetype from filename/content-type
+        mimetype = audio_file.content_type or "audio/webm"
+        source = {"buffer": audio_bytes, "mimetype": mimetype}
 
-        # Configure model options
+        # ─── High-accuracy medical transcription options ───
         options = PrerecordedOptions(
-            model="nova-2-medical",
-            smart_format=True
+            model="nova-2-medical",       # Medical-domain model
+            smart_format=True,            # Auto-punctuation & formatting
+            punctuate=True,               # Ensure punctuation
+            diarize=False,                # Single-speaker dictation
+            paragraphs=True,              # Paragraph breaks for readability
+            utterances=True,              # Detect utterance boundaries
+            numerals=True,                # Convert spoken numbers to digits
+            measurements=True,            # Handle "milligrams", "milliliters" etc.
+            dictation=True,               # Optimize for dictation-style speech
+            filler_words=False,           # Remove "um", "uh" for cleaner notes
+            keywords=[                    # Boost recognition of common medical terms
+                "milligrams:2", "milliliters:2", "twice daily:2",
+                "once daily:2", "three times:2", "blood pressure:2",
+                "heart rate:2", "oxygen saturation:2", "temperature:2",
+                "prescription:2", "diagnosis:2", "prognosis:2",
+                "hypertension:2", "diabetes:2", "cholesterol:2",
+                "antibiotic:2", "paracetamol:2", "ibuprofen:2",
+                "metformin:2", "amlodipine:2", "omeprazole:2",
+                "ECG:2", "MRI:2", "CT scan:2", "X-ray:2",
+                "CBC:2", "HbA1c:2", "creatinine:2", "hemoglobin:2",
+            ],
         )
 
         # Perform transcription
@@ -49,8 +70,17 @@ async def transcribe_audio():
         confidence = getattr(alt, "confidence", 0.0)
         words = getattr(alt, "words", [])
 
+        # ─── Post-processing: fix common medical misrecognitions ───
+        transcript = _post_process_medical_transcript(transcript)
+
         print(f"✅ Transcription complete (confidence: {confidence:.2%})")
         print(f"📝 Transcript: {transcript[:100]}...")
+
+        log_audit(
+            AuditAction.VOICE_TRANSCRIBE,
+            patient_id=patient_id,
+            details={"confidence": confidence, "transcript_length": len(transcript)},
+        )
 
         return jsonify({
             "success": True,
@@ -84,24 +114,43 @@ def process_notes():
         print(f"📝 Notes length: {len(notes)} chars")
         print(f"{'='*60}\n")
 
-        prompt = f"""You are a medical assistant. Convert this medical dictation and correct if any mistakes in 
-                  pronunciation to JSON format with these fields:
+        prompt = f"""You are a senior clinical documentation specialist. Your task is to convert 
+raw medical dictation into a precise, structured JSON medical record.
 
-- Allergy: List any allergies mentioned. If none, say "None known". Format as array of strings.
-- Complaints_Presented: Chief complaints and presenting symptoms. Be specific.
-- Diagnosis: Primary and secondary diagnoses if mentioned.
-- Rx: Prescriptions with medication name, dosage, frequency, and duration. Format as array.
-- History: Relevant medical history mentioned (past conditions, surgeries, family history).
-- Advice_FollowUp: Follow-up instructions, lifestyle advice, when to return.
+RULES:
+1. Fix any transcription errors by interpreting medical context (e.g. "metformin" not "met four men").
+2. Normalise drug names to their correct generic spelling.
+3. Use standard medical abbreviations where appropriate (e.g. "b.i.d." for twice daily).
+4. Convert colloquial descriptions to proper medical terminology 
+   (e.g. "sugar problem" -> "Type 2 Diabetes Mellitus").
+5. Preserve exact dosages, frequencies, and durations as dictated.
+6. If information is missing, use "Not mentioned" (string) or [] (array), NEVER fabricate data.
+7. Return ONLY valid JSON -- no markdown, no explanation, no code fences.
 
-Important:
-- Use proper medical terminology.
-- Be concise but complete.
-- If information is not mentioned, use "Not mentioned" or empty array.
-- Return ONLY valid JSON.
+OUTPUT SCHEMA (follow exactly):
+{{
+  "Allergy": ["<allergy1>", ...],
+  "Complaints_Presented": "<chief complaints and HPI>",
+  "Diagnosis": "<primary diagnosis; secondary if mentioned>",
+  "Rx": [
+    {{
+      "Medication": "<generic drug name>",
+      "Dosage": "<amount + unit>",
+      "Frequency": "<e.g. twice daily / b.i.d.>",
+      "Duration": "<e.g. 7 days>"
+    }}
+  ],
+  "History": "<relevant PMH, surgical history, family history>",
+  "Advice_FollowUp": "<lifestyle advice, follow-up date/instructions>",
+  "Visit_Summary": "<2-3 sentence clinical summary>"
+}}
 
-Medical Dictation:
+MEDICAL DICTATION:
+\"\"\"
 {notes}
+\"\"\"
+
+Return the JSON now.
 """
 
         response = gemini_model.generate_content(prompt)
@@ -125,6 +174,13 @@ Medical Dictation:
             structured.setdefault(key, default)
 
         print("✅ Structured data generated successfully")
+
+        log_audit(
+            AuditAction.VOICE_PROCESS,
+            patient_id=patient_id,
+            details={"notes_length": len(notes), "fields": list(structured.keys())},
+        )
+
         return jsonify({"success": True, "structured": structured})
 
     except json.JSONDecodeError as e:
@@ -171,6 +227,13 @@ def save_note():
         result = emr_collection.insert_one(emr_doc)
 
         print(f"✅ EMR saved for patient {patient_id} with ID {result.inserted_id}")
+
+        log_audit(
+            AuditAction.EMR_SAVE,
+            patient_id=patient_id,
+            details={"emr_id": str(result.inserted_id), "confidence": transcription_confidence},
+        )
+
         return jsonify({
             "success": True,
             "message": "EMR saved successfully",
@@ -200,6 +263,13 @@ def get_patient_history(patient_id):
         for note in notes:
             if "timestamp" in note:
                 note["timestamp"] = note["timestamp"].isoformat()
+
+        log_audit(
+            AuditAction.EMR_VIEW_HISTORY,
+            patient_id=patient_id,
+            details={"records_returned": len(notes)},
+        )
+
         return jsonify({"success": True, "notes": notes, "count": len(notes)})
     except Exception as e:
         print(f"❌ History Error: {e}")
@@ -218,3 +288,70 @@ def voice_health():
         "status": "operational",
         "model": "nova-2-medical"
     })
+
+
+# -------------------------------------------
+# 🔧 MEDICAL TRANSCRIPT POST-PROCESSING
+# -------------------------------------------
+
+# Common medical misrecognitions from speech-to-text
+_MEDICAL_CORRECTIONS = {
+    # Drug names
+    r"\bmet four men\b": "metformin",
+    r"\bmet forman\b": "metformin",
+    r"\baml oh dip een\b": "amlodipine",
+    r"\bam low dipping\b": "amlodipine",
+    r"\boh mep razole\b": "omeprazole",
+    r"\boh mega prism\b": "omeprazole",
+    r"\bpara see tamol\b": "paracetamol",
+    r"\bpair a see tamol\b": "paracetamol",
+    r"\bi buprofen\b": "ibuprofen",
+    r"\bata nor vast a tin\b": "atorvastatin",
+    r"\batter vast a tin\b": "atorvastatin",
+    r"\blose art an\b": "losartan",
+    r"\bceft ree axon\b": "ceftriaxone",
+    r"\bazithro my sin\b": "azithromycin",
+    r"\bamox a cill in\b": "amoxicillin",
+    r"\bam oxo cill in\b": "amoxicillin",
+    # Dosage units
+    r"\bm g\b": "mg",
+    r"\bm l\b": "mL",
+    r"\bmilli grams?\b": "mg",
+    r"\bmilli liters?\b": "mL",
+    r"\bmicro grams?\b": "mcg",
+    # Medical terms
+    r"\bhyper tension\b": "hypertension",
+    r"\bdie a beat ease\b": "diabetes",
+    r"\bdie a beet is\b": "diabetes",
+    r"\btack ee card ee a\b": "tachycardia",
+    r"\bbrad ee card ee a\b": "bradycardia",
+    r"\ban gee na\b": "angina",
+    r"\bhemo globe in\b": "hemoglobin",
+    r"\bcree at a nine\b": "creatinine",
+    r"\bcree at in een\b": "creatinine",
+    # Frequencies
+    r"\bb\.?i\.?d\.?\b": "b.i.d.",
+    r"\bt\.?i\.?d\.?\b": "t.i.d.",
+    r"\bq\.?i\.?d\.?\b": "q.i.d.",
+    r"\bo\.?d\.?\b": "o.d.",
+    r"\btwice daily\b": "b.i.d.",
+    r"\bthrice daily\b": "t.i.d.",
+    # Lab tests
+    r"\bh b a one see\b": "HbA1c",
+    r"\bc b c\b": "CBC",
+    r"\be c g\b": "ECG",
+    r"\be k g\b": "EKG",
+    r"\bm r i\b": "MRI",
+    r"\bc t scan\b": "CT scan",
+}
+
+
+def _post_process_medical_transcript(transcript: str) -> str:
+    """
+    Apply rule-based corrections for common medical speech-to-text errors.
+    Runs after Deepgram returns the raw transcript but before Gemini processes it.
+    """
+    corrected = transcript
+    for pattern, replacement in _MEDICAL_CORRECTIONS.items():
+        corrected = re.sub(pattern, replacement, corrected, flags=re.IGNORECASE)
+    return corrected

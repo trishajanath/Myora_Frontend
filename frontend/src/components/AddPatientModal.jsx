@@ -61,7 +61,7 @@ function AddPatientModal({ isOpen, onClose, onSave, editingPatient }) {
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{editingPatient ? 'Edit Patient' : 'Add New Patient'}</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button className="modal-close" onClick={onClose}>X</button>
         </div>
 
         <form onSubmit={handleSubmit} className="patient-form">

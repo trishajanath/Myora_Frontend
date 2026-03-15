@@ -14,13 +14,24 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  --color-primary: #111827;
+  --color-secondary: #374151;
+  --color-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-border-dark: #d1d5db;
+  --color-bg: #f9fafb;
+  --color-surface: #ffffff;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f8fafc;
+  background: var(--color-bg);
+  color: var(--color-primary);
 }
 
 #root {

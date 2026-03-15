@@ -19,7 +19,7 @@ function PatientDetails({ patient, onClose }) {
           <h2>{patient.name}</h2>
           <span className="patient-id-badge">{patient.id}</span>
         </div>
-        <button className="close-btn" onClick={onClose}>✕</button>
+        <button className="close-btn" onClick={onClose}>X</button>
       </div>
 
       <div className="details-content">
@@ -54,7 +54,7 @@ function PatientDetails({ patient, onClose }) {
             {patient.history && patient.history.length > 0 ? (
               patient.history.map((item, index) => (
                 <div key={index} className="history-item">
-                  <span className="history-icon">✓</span>
+                  <span className="history-icon">+</span>
                   {item}
                 </div>
               ))

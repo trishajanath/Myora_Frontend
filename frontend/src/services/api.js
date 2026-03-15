@@ -60,3 +60,44 @@ export const patientAPI = {
     }
   }
 };
+
+export const consultantAPI = {
+  extractNotes: async (files) => {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('files', f));
+    const response = await axios.post(
+      `${API_BASE_URL}/consultant/extract_notes`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
+  saveNotes: async (patientId, extractedJson) => {
+    const response = await axios.post(`${API_BASE_URL}/consultant/save_notes`, {
+      patient_id: patientId,
+      extracted_json: extractedJson,
+    });
+    return response.data;
+  },
+
+  getNotes: async (patientId) => {
+    const response = await axios.get(
+      `${API_BASE_URL}/consultant/get_notes/${encodeURIComponent(patientId)}`
+    );
+    return response.data;
+  },
+};
+
+export const auditAPI = {
+  getLogs: async ({ patientId, action, limit } = {}) => {
+    const params = new URLSearchParams();
+    if (patientId) params.set('patient_id', patientId);
+    if (action) params.set('action', action);
+    if (limit) params.set('limit', String(limit));
+    const response = await axios.get(
+      `http://localhost:5001/api/audit?${params.toString()}`
+    );
+    return response.data;
+  },
+};

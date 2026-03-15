@@ -1,184 +1,223 @@
+/* ===== Container ===== */
 .patient-details-container {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: var(--color-surface);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
   height: 100%;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
+/* ===== Empty State ===== */
 .no-selection {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  color: #6b7280;
+  flex: 1;
+  color: var(--color-muted);
   text-align: center;
+  padding: 40px;
 }
 
 .no-selection h2 {
-  color: #3b82f6;
-  margin-bottom: 12px;
+  color: var(--color-secondary);
+  margin-bottom: 6px;
+  font-size: 16px;
+  font-weight: 700;
 }
 
+.no-selection p {
+  font-size: 13px;
+}
+
+/* ===== Header ===== */
 .details-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #dbeafe;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
 }
 
 .details-header h2 {
-  color: #1e40af;
-  margin: 0 0 8px 0;
-  font-size: 28px;
+  color: var(--color-primary);
+  margin: 0 0 6px 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
 }
 
 .patient-id-badge {
-  background: #3b82f6;
+  background: var(--color-primary);
   color: white;
-  padding: 6px 16px;
-  border-radius: 16px;
-  font-size: 14px;
-  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .close-btn {
-  background: #ef4444;
-  color: white;
-  border: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  font-size: 18px;
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  border: 1px solid var(--color-border);
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  font-size: 14px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.15s;
+  flex-shrink: 0;
 }
 
 .close-btn:hover {
-  background: #dc2626;
-  transform: scale(1.1);
+  background: var(--color-border);
+  color: var(--color-primary);
 }
 
+/* ===== Content ===== */
 .details-content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 0;
+  flex: 1;
+  padding: 0;
 }
 
+/* ===== Info Sections ===== */
 .info-section {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  padding: 20px;
-  border-radius: 10px;
-  border: 2px solid #93c5fd;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.info-section:last-child {
+  border-bottom: none;
 }
 
 .info-section h3 {
-  color: #1e40af;
-  margin: 0 0 16px 0;
-  font-size: 18px;
-  font-weight: 600;
+  color: var(--color-primary);
+  margin: 0 0 14px 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
 .info-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
 }
 
 .info-label {
-  color: #1e40af;
-  font-size: 12px;
-  font-weight: 600;
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
 }
 
 .info-value {
-  color: #374151;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.condition-badge {
-  background: #3b82f6;
-  color: white;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-size: 16px;
+  color: var(--color-primary);
+  font-size: 15px;
   font-weight: 600;
-  display: inline-block;
 }
 
+/* ===== Condition ===== */
+.condition-badge {
+  background: var(--color-primary);
+  color: white;
+  padding: 10px 18px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-block;
+  letter-spacing: 0.3px;
+}
+
+/* ===== History ===== */
 .history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-item {
+  background: var(--color-bg);
+  padding: 10px 14px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-secondary);
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+}
+
+.history-icon {
+  background: var(--color-primary);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.no-history {
+  color: var(--color-muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+/* ===== Notes ===== */
+.notes-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.history-item {
-  background: white;
-  padding: 12px 16px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #374151;
-  border: 1px solid #bfdbfe;
-}
-
-.history-icon {
-  background: #3b82f6;
-  color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.no-history {
-  color: #6b7280;
-  font-style: italic;
-}
-
-.notes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .note-item {
-  background: white;
-  border-radius: 8px;
+  background: var(--color-surface);
+  border-radius: 6px;
   overflow: hidden;
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--color-border);
 }
 
 .note-header {
-  background: #3b82f6;
+  background: var(--color-primary);
   color: white;
   padding: 8px 16px;
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .note-content {
-  padding: 12px 16px;
-  color: #374151;
-  line-height: 1.6;
+  padding: 14px 16px;
+  color: var(--color-secondary);
+  line-height: 1.7;
   white-space: pre-wrap;
-  font-size: 14px;
+  font-size: 13px;
+  background: var(--color-bg);
 }

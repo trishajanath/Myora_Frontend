@@ -1,215 +1,9 @@
-# """
-# routes/consultant_notes.py
-# ----------------------------------------------------------
-# Handles Consultant Notes Extraction from multiple image uploads
-# using Gemini 2.0 Flash and stores structured JSON in MongoDB.
-# ----------------------------------------------------------
-# """
-
-# import io
-# import re
-# import base64
-# import json
-# from datetime import datetime
-# from flask import Blueprint, request, jsonify
-# from PIL import Image
-# import google.generativeai as genai
-# from config import Config
-# from db import db
-
-# # ---------------- Configuration ----------------
-# consultant_bp = Blueprint("consultant_bp", __name__)
-# collection = db["extracted_notes"]
-
-# # Gemini setup
-# genai.configure(api_key=Config.GEMINI_API_KEY)
-# GEMINI_MODEL = genai.GenerativeModel("gemini-2.0-flash")
-
-# # ---------------- Helper Functions ----------------
-# def clean_json_response(response_text):
-#     """Extract valid JSON from Gemini response text."""
-#     if not response_text:
-#         return None
-#     response_text = response_text.strip().replace('```json', '').replace('```', '')
-#     start_idx, end_idx = response_text.find('{'), response_text.rfind('}')
-#     if start_idx != -1 and end_idx != -1:
-#         json_str = response_text[start_idx:end_idx + 1]
-#         json_str = re.sub(r',\s*}', '}', json_str)
-#         json_str = re.sub(r',\s*]', ']', json_str)
-#         return json_str
-#     return None
-
-
-# def extract_medical_notes_from_image(img):
-#     """Extract structured consultant notes from an image using Gemini."""
-#     buf = io.BytesIO()
-#     img.save(buf, format="PNG")
-#     img_b64 = base64.b64encode(buf.getvalue()).decode()
-
-#     prompt = """You are a medical data extraction expert. Analyze this CONSULTANT NOTES table and extract ALL information.
-
-# **TABLE STRUCTURE:**
-# This table has these columns:
-# - "No. of DAYS" (shows DAY 1, DAY 2, DAY 3, DAY 4)
-# - "Date:" field at the start of each row
-# - "CONSULTANT NOTES" (main column with handwritten doctor's notes)
-# - "INV." (Investigations column)
-# - "PLAN" (Plan column)
-
-# **INSTRUCTIONS:**
-# 1. Extract data for EACH DAY visible in the table (DAY 1, DAY 2, DAY 3, DAY 4)
-# 2. For each day, extract:
-#    - Day number
-#    - Date (if written in Date: field)
-#    - Everything written in CONSULTANT NOTES column
-#    - Everything written in INV. column  
-#    - Everything written in PLAN column
-# 3. This is doctor's handwriting - make your BEST effort to read it and try to replace it with respect to the surrounding context words if found wrong
-# 4. If uncertain about a word, add [check] after it
-# 5. DO NOT skip illegible text - try to read it and mark uncertain words
-
-# **OUTPUT FORMAT:**
-# Return ONLY valid JSON in this exact format:
-# {
-#   "days": [
-#     {
-#       "day_number": 1,
-#       "date": "date as written or null",
-#       "consultant_notes": "everything from consultant notes column",
-#       "investigations": "everything from INV column or null",
-#       "plan": "everything from PLAN column or null"
-#     },
-#     {
-#       "day_number": 2,
-#       "date": "date as written or null",
-#       "consultant_notes": "everything from consultant notes column",
-#       "investigations": "everything from INV column or null",
-#       "plan": "everything from PLAN column or null"
-#     }
-#   ]
-# }
-# Extract ALL days now. Return ONLY the JSON, no explanations."""
-
-#     response = GEMINI_MODEL.generate_content(
-#         [
-#             {"inline_data": {"data": img_b64, "mime_type": "image/png"}},
-#             {"text": prompt}
-#         ],
-#         generation_config={"temperature": 0.2, "max_output_tokens": 8192}
-#     )
-
-#     if response and response.text:
-#         response_text = response.text.strip()
-#         cleaned_json = clean_json_response(response_text)
-#         if cleaned_json:
-#             try:
-#                 return json.loads(cleaned_json)
-#             except json.JSONDecodeError:
-#                 pass
-#     return {"days": []}
-
-
-# def merge_day_data(existing_data, new_data):
-#     """Merge day-wise consultant note data."""
-#     all_days = {day["day_number"]: day for day in existing_data.get("days", [])}
-
-#     for day_info in new_data.get("days", []):
-#         day_num = day_info.get("day_number")
-#         if day_num not in all_days:
-#             all_days[day_num] = day_info
-#         else:
-#             # Merge non-empty fields
-#             for key, val in day_info.items():
-#                 if val and not all_days[day_num].get(key):
-#                     all_days[day_num][key] = val
-
-#     return {"days": list(all_days.values())}
-
-
-# @consultant_bp.route("/extract_notes", methods=["POST"])
-# def extract_notes():
-#     """
-#     POST: Extract day-wise consultant notes from images.
-#     Does NOT save to DB.
-#     """
-#     try:
-#         if "files" not in request.files:
-#             return jsonify({"error": "At least one image file is required"}), 400
-
-#         images = request.files.getlist("files")
-#         all_extracted_data = {"days": []}
-
-#         for img_file in images:
-#             img = Image.open(img_file.stream)
-#             if img.mode not in ("RGB", "L"):
-#                 img = img.convert("RGB")
-#             extracted = extract_medical_notes_from_image(img)
-#             all_extracted_data = merge_day_data(all_extracted_data, extracted)
-
-#         return jsonify({
-#             "message": "Extraction successful",
-#             "extracted_json": all_extracted_data
-#         })
-#     # except Exception as e:
-#     #     return jsonify({"error": f"Extraction failed: {str(e)}"}), 500
-#     except Exception as e:
-#         print("❌ extract_notes crashed")
-#         print("Error:", e)
-#         import traceback
-#         traceback.print_exc()
-#         return jsonify({"error": str(e)}), 500
-
-
-# @consultant_bp.route("/save_notes", methods=["POST"])
-# def save_notes():
-#     """
-#     POST: Save extracted notes JSON to MongoDB.
-#     Requires: patient_id + extracted_json
-#     """
-#     try:
-#         data = request.get_json()
-
-#         patient_id = data.get("patient_id")
-#         extracted_json = data.get("extracted_json")
-
-#         if not patient_id:
-#             return jsonify({"error": "patient_id is required"}), 400
-#         if not extracted_json:
-#             return jsonify({"error": "extracted_json is required"}), 400
-
-#         output_doc = {
-#             "patient_id": patient_id,
-#             "uploaded_at": datetime.now().isoformat(),
-#             "total_days_extracted": len(extracted_json.get("days", [])),
-#             "data": extracted_json
-#         }
-
-#         inserted_id = collection.insert_one(output_doc).inserted_id
-
-#         return jsonify({
-#             "message": "Saved to DB",
-#             "mongo_id": str(inserted_id)
-#         })
-#     except Exception as e:
-#         return jsonify({"error": f"Save failed: {str(e)}"}), 500
-
-# @consultant_bp.route("/get_notes/<patient_id>", methods=["GET"])
-# def get_notes(patient_id):
-#     """Fetch all extracted consultant notes for a patient."""
-#     results = list(collection.find({"patient_id": patient_id}, {"_id": 0}))
-#     if not results:
-#         return jsonify({"message": "No records found"}), 404
-#     return jsonify(results)
-
-
-
-
-
+# -*- coding: utf-8 -*-
 """
 routes/consultant_notes.py
 ----------------------------------------------------------
 Handles Consultant Notes Extraction from multiple image uploads
-using Gemini 2.0 Flash and stores structured JSON in MongoDB.
+using Gemini 2.5 Flash and stores structured JSON in MongoDB.
 ----------------------------------------------------------
 """
 
@@ -218,10 +12,11 @@ import re
 import json
 from datetime import datetime
 from flask import Blueprint, request, jsonify
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 import google.generativeai as genai
 from config import Config
 from db import db
+from audit import log_audit, AuditAction
 
 # ---------------- Configuration ----------------
 consultant_bp = Blueprint("consultant_bp", __name__)
@@ -229,7 +24,7 @@ collection = db["extracted_notes"]
 
 # ---------------- Gemini Setup ----------------
 genai.configure(api_key=Config.GEMINI_API_KEY)
-GEMINI_MODEL = genai.GenerativeModel("gemini-2.0-flash")
+GEMINI_MODEL = genai.GenerativeModel("gemini-2.5-flash")
 
 # ---------------- Helper Functions ----------------
 def clean_json_response(response_text: str):
@@ -255,20 +50,109 @@ def clean_json_response(response_text: str):
     return json_str
 
 
+def preprocess_image(img: Image.Image) -> Image.Image:
+    """Enhance image for better handwriting recognition."""
+    # Auto-orient based on EXIF data
+    img = ImageOps.exif_transpose(img)
+
+    # Upscale small images — larger = more readable for the model
+    min_dim = 2000
+    w, h = img.size
+    if max(w, h) < min_dim:
+        scale = min_dim / max(w, h)
+        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+
+    # Convert to grayscale for cleaner text
+    gray = img.convert("L")
+
+    # Denoise: slight blur to reduce speckle before sharpening
+    gray = gray.filter(ImageFilter.MedianFilter(size=3))
+
+    # Increase contrast strongly to make ink stand out
+    gray = ImageEnhance.Contrast(gray).enhance(2.5)
+
+    # Sharpen aggressively to restore edge detail
+    gray = gray.filter(ImageFilter.SHARPEN)
+    gray = gray.filter(ImageFilter.SHARPEN)
+    gray = ImageEnhance.Sharpness(gray).enhance(2.0)
+
+    # Auto-contrast to use full dynamic range
+    gray = ImageOps.autocontrast(gray, cutoff=1)
+
+    # Back to RGB (required by Gemini)
+    return gray.convert("RGB")
+
+
+def prepare_original_image(img: Image.Image) -> Image.Image:
+    """Prepare the original image (no heavy processing) for cross-reference."""
+    img = ImageOps.exif_transpose(img)
+
+    # Only upscale if very small
+    min_dim = 1800
+    w, h = img.size
+    if max(w, h) < min_dim:
+        scale = min_dim / max(w, h)
+        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    return img
+
+
 def extract_medical_notes_from_image(img: Image.Image):
-    """Extract structured data from any medical document image using Gemini."""
+    """Extract structured data from any medical document image using Gemini.
+    Sends both the original and a preprocessed version for cross-referencing."""
 
-    prompt = """
-You are a medical data extraction expert. Analyze this medical document image and extract ALL visible information.
+    original = prepare_original_image(img)
+    enhanced = preprocess_image(img)
 
-**INSTRUCTIONS:**
-1. Identify the document type (e.g. OPD Summary, Consultant Notes, Prescription, Lab Report, Discharge Summary, etc.)
-2. Extract every field, section, and value visible in the document
-3. For handwritten text, make your best effort to read it; mark uncertain words with [check]
-4. Do NOT skip any section - extract everything
+    prompt = """You are an expert medical document OCR specialist with years of experience reading doctors' handwriting with extremely high accuracy.
+
+**IMAGES PROVIDED:**
+You are given TWO versions of the same document:
+- Image 1: The original image in full color
+- Image 2: An enhanced/sharpened version for better text visibility
+Cross-reference BOTH images when reading. If a letter is unclear in one, check the other.
+
+**YOUR TASK:**
+Carefully read this medical document image. It likely contains handwritten text by a doctor or hospital staff. Transcribe EVERY piece of visible text with maximum accuracy.
+
+**HANDWRITING READING RULES (critical for accuracy):**
+1. Read EACH word letter by letter, slowly. Do NOT guess whole words from the first few letters.
+2. Use MEDICAL CONTEXT to resolve ambiguous letters:
+   - If a word looks like gibberish, think about what medical term fits the context.
+   - Common misreads: "a" vs "o", "e" vs "c", "n" vs "m", "u" vs "v", "r" vs "n", "h" vs "b", "i" vs "l",  "t" vs "f"
+   - Examples: "Sciatpu" -> "Sciatica", "Erymmen" -> "Erythema", "Serome" -> "Syndrome"
+3. Common medical abbreviations (KEEP as-is, do not expand): BP, HR, RR, SpO2, OPD, IPD, OT, ICU, IV, IM, PO, BD, TDS, QID, PRN, SOS, Rx, Dx, Hx, c/o, h/o, k/c/o, s/p, etc.
+4. For PATIENT NAMES and PROPER NOUNS: read letter by letter from the image. Slashes in names (like "Kishore/Kumar") usually mean "son/daughter of" -- preserve them.
+5. For DATES: look for patterns DD/MM/YY or DD/MM/YYYY. Numbers that look odd are probably dates.
+6. For MEDICATIONS: match partial readings to real drug names:
+   - "Amoxclv" -> "Amoxiclav", "Pantprzl" -> "Pantoprazole", "Ceftxm" -> "Ceftriaxone"
+   - "Azithro" -> "Azithromycin", "Metfrmn" -> "Metformin", "Atorvst" -> "Atorvastatin"
+   - "Paractml" -> "Paracetamol", "Ibuprfn" -> "Ibuprofen", "Omeprzl" -> "Omeprazole"
+7. For DIAGNOSES: match to real medical conditions:
+   - "IVDP" -> "IVDP (Intervertebral Disc Prolapse)", "LBA" -> "Low Back Ache"
+   - "HTN" -> "Hypertension", "DM" -> "Diabetes Mellitus", "CAD" -> "Coronary Artery Disease"
+8. If a word is STILL unclear after checking both images, write your best reading and add [?] after it.
+9. NEVER output random characters, Greek letters, or symbols. Always produce readable English text.
+10. For NUMBERS (vitals, doses, lab values): read each digit carefully. Distinguish 1/7, 3/8, 5/6, 0/6/9.
+
+**VERIFICATION STEP:**
+After your first reading, re-read each field and verify:
+- Do all drug names correspond to real medications?
+- Do diagnoses correspond to real medical conditions?
+- Are dates in a valid format?
+- Do patient details (age, sex) look reasonable?
+Correct any errors before producing the final output.
+
+**DOCUMENT ANALYSIS:**
+1. First identify the document type (OPD Summary, Consultant Notes, Prescription, Medical Certificate, Lab Report, Discharge Summary, Referral Letter, Progress Notes, etc.)
+2. Extract EVERY visible section, field, and value -- do not skip anything
+3. Preserve the structure (tables, rows, columns, sections)
+4. For tabular data, represent each row as a separate section entry
 
 **OUTPUT FORMAT:**
-Return ONLY valid JSON with this structure (adapt sections to match whatever is in the document):
+Return ONLY valid JSON (no text before or after):
 {
   "document_type": "type of document",
   "patient_info": {
@@ -282,25 +166,25 @@ Return ONLY valid JSON with this structure (adapt sections to match whatever is 
   },
   "sections": [
     {
-      "title": "section heading (e.g. HISTORY, EXAMINATION, DIAGNOSIS, PRESCRIPTION, etc.)",
-      "content": "all text content in this section as a string"
+      "title": "section heading",
+      "content": "fully transcribed text content of this section"
     }
   ],
   "investigations": "any investigations/tests mentioned or null",
   "diagnosis": "diagnosis if present or null",
-  "prescription": "medications/treatment if present or null",
+  "prescription": "medications/treatment with dosages if present or null",
   "notes": "any additional notes or null"
 }
 
-Return ONLY the JSON. No explanations.
-"""
+Return ONLY the JSON, no explanations."""
 
     try:
+        # Send both images for cross-referencing
         response = GEMINI_MODEL.generate_content(
-            [img, prompt],
+            [original, enhanced, prompt],
             generation_config={
-                "temperature": 0.2,
-                "max_output_tokens": 8192
+                "temperature": 0.1,
+                "max_output_tokens": 16384
             }
         )
 
@@ -310,12 +194,24 @@ Return ONLY the JSON. No explanations.
         cleaned_json = clean_json_response(response.text)
 
         if not cleaned_json:
-            return {"document_type": "unknown", "sections": [], "raw_text": response.text}
+            # Retry with slightly higher temperature if first attempt failed to produce JSON
+            response = GEMINI_MODEL.generate_content(
+                [original, enhanced, prompt + "\n\nIMPORTANT: You MUST return valid JSON only."],
+                generation_config={
+                    "temperature": 0.3,
+                    "max_output_tokens": 16384
+                }
+            )
+            if response and response.text:
+                cleaned_json = clean_json_response(response.text)
+
+            if not cleaned_json:
+                return {"document_type": "unknown", "sections": [], "raw_text": response.text if response else ""}
 
         return json.loads(cleaned_json)
 
     except Exception as e:
-        print("❌ Gemini extraction failed:", e)
+        print("Gemini extraction failed:", e)
         import traceback
         traceback.print_exc()
         return {"document_type": "unknown", "sections": [], "error": str(e)}
@@ -361,13 +257,18 @@ def extract_notes():
             extracted = extract_medical_notes_from_image(img)
             all_extracted_data = merge_day_data(all_extracted_data, extracted)
 
+        log_audit(
+            AuditAction.OCR_EXTRACT,
+            details={"images_count": len(images), "document_type": all_extracted_data.get("document_type")},
+        )
+
         return jsonify({
             "message": "Extraction successful",
             "extracted_json": all_extracted_data
         })
 
     except Exception as e:
-        print("❌ extract_notes crashed:", e)
+        print("extract_notes error:", e)
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
@@ -401,6 +302,12 @@ def save_notes():
 
         result = collection.insert_one(doc)
 
+        log_audit(
+            AuditAction.OCR_SAVE,
+            patient_id=patient_id,
+            details={"mongo_id": str(result.inserted_id)},
+        )
+
         return jsonify({
             "message": "Saved successfully",
             "mongo_id": str(result.inserted_id)
@@ -414,6 +321,13 @@ def save_notes():
 def get_notes(patient_id):
     """Fetch extracted consultant notes for a patient."""
     results = list(collection.find({"patient_id": patient_id}, {"_id": 0}))
+
+    log_audit(
+        AuditAction.OCR_VIEW,
+        patient_id=patient_id,
+        details={"records_returned": len(results)},
+    )
+
     if not results:
         return jsonify({"message": "No records found"}), 404
     return jsonify(results)

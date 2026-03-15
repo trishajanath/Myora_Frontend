@@ -8,8 +8,11 @@ eventlet==0.35.1
 pymongo==4.6.1
 
 # AI/ML APIs
-google-generativeai==0.3.2
+google-generativeai>=0.8.0
 deepgram-sdk==3.2.0
+
+# Image processing (OCR preprocessing)
+Pillow>=10.0.0
 
 # Utilities
 python-dotenv==1.0.0

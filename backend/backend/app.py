@@ -1,9 +1,17 @@
-from flask import Flask, jsonify
+import sys
+import os
+
+# Ensure UTF-8 output on Windows terminals
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
+
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from pymongo.errors import ServerSelectionTimeoutError
 from db import inpatients
 from config import Config
-import os
 
 app = Flask(__name__)
 
@@ -18,6 +26,32 @@ from routes.consultant_notes import consultant_bp
 app.register_blueprint(patients_bp, url_prefix="/api/patients")
 app.register_blueprint(voice_bp, url_prefix="/api/voice")
 app.register_blueprint(consultant_bp, url_prefix="/api/consultant")
+
+
+# ✅ Audit log viewer endpoint
+@app.route("/api/audit", methods=["GET"])
+def get_audit_logs():
+    """Retrieve audit log entries. Query params: patient_id, action, limit."""
+    from db import audit_logs
+
+    query = {}
+    if request.args.get("patient_id"):
+        query["patient_id"] = request.args["patient_id"]
+    if request.args.get("action"):
+        query["action"] = request.args["action"]
+
+    limit = min(int(request.args.get("limit", 100)), 500)
+
+    logs = list(
+        audit_logs.find(query, {"_id": 0})
+        .sort("timestamp", -1)
+        .limit(limit)
+    )
+    for log in logs:
+        if "timestamp" in log:
+            log["timestamp"] = log["timestamp"].isoformat()
+
+    return jsonify({"success": True, "logs": logs, "count": len(logs)})
 
 
 @app.route("/")

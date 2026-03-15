@@ -28,21 +28,38 @@
 
 from flask import Blueprint, jsonify, request
 from utils.patient_utils import add_patient, get_all_patients, delete_patient, edit_patient
+from audit import log_audit, AuditAction
 
 patients_bp = Blueprint("patients", __name__)
 
 @patients_bp.route("/", methods=["GET", "POST", "DELETE", "PUT"])
 def handle_patients():
     if request.method == "POST":
-        return jsonify(add_patient(request.json))
+        result = add_patient(request.json)
+        log_audit(
+            AuditAction.PATIENT_CREATE,
+            patient_id=request.json.get("name"),
+            details={"fields": list(request.json.keys())},
+        )
+        return jsonify(result)
 
     elif request.method == "GET":
-        return jsonify(get_all_patients())
+        result = get_all_patients()
+        log_audit(AuditAction.PATIENT_VIEW_ALL)
+        return jsonify(result)
 
     elif request.method == "DELETE":
         identifier = request.args.get("name")
-        return jsonify(delete_patient(identifier))
+        result = delete_patient(identifier)
+        log_audit(AuditAction.PATIENT_DELETE, patient_id=identifier)
+        return jsonify(result)
 
     elif request.method == "PUT":
         identifier = request.args.get("name")
-        return jsonify(edit_patient(identifier, request.json))
+        result = edit_patient(identifier, request.json)
+        log_audit(
+            AuditAction.PATIENT_UPDATE,
+            patient_id=identifier,
+            details={"fields_changed": list(request.json.keys())},
+        )
+        return jsonify(result)

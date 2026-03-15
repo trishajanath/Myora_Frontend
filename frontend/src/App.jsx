@@ -5,6 +5,7 @@ import PatientDetails from './components/PatientDetails';
 import AddPatientModal from './components/AddPatientModal';
 import VoiceRecorder from './components/VoiceRecorder';
 import ConsultantNotes from './components/ConsultantNotes';
+import AuditLog from './components/AuditLog';
 import { patientAPI } from './services/api';
 
 function App() {
@@ -97,7 +98,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-content">
-          <h1>Myora</h1>
+          <h1>MYORA <span style={{ fontWeight: 400, fontSize: '11px', opacity: 0.6, letterSpacing: '1.5px', marginLeft: '8px', textTransform: 'uppercase' }}>Healthcare Platform</span></h1>
           <button className="btn-add-patient" onClick={() => setIsModalOpen(true)}>
             + Add Patient
           </button>
@@ -122,6 +123,12 @@ function App() {
           onClick={() => setActiveTab('documents')}
         >
           Documents
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}
+          onClick={() => setActiveTab('audit')}
+        >
+          Audit Log
         </button>
       </div>
 
@@ -181,6 +188,12 @@ function App() {
                 <div className="right-panel">
                   <ConsultantNotes selectedPatient={selectedPatient} />
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'audit' && (
+              <div className="audit-view">
+                <AuditLog />
               </div>
             )}
           </>
