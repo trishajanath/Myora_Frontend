@@ -1,0 +1,144 @@
+[
+  {
+    "id": 1,
+    "notes": "Patient complains of chest pain radiating to the left arm for the past two days. History of hypertension for 5 years. No known drug allergies. ECG shows mild ST depression. Diagnosis — unstable angina. Prescribe aspirin 75 mg once daily for 10 days and atorvastatin 10 mg once daily for 15 days. Advise follow-up in one week.",
+    "expected": {
+      "Allergy": ["None known"],
+      "Complaints_Presented": "Chest pain radiating to the left arm for 2 days",
+      "Diagnosis": "Unstable angina",
+      "Rx": [
+        {"Medication": "Aspirin", "Dosage": "75 mg", "Frequency": "Once daily", "Duration": "10 days"},
+        {"Medication": "Atorvastatin", "Dosage": "10 mg", "Frequency": "Once daily", "Duration": "15 days"}
+      ],
+      "History": "Hypertension for 5 years",
+      "Advice_FollowUp": "Follow-up in one week"
+    }
+  },
+  {
+    "id": 2,
+    "notes": "Patient presents with shortness of breath on exertion and mild pedal edema. Has diabetes and hypertension. Echo shows reduced ejection fraction of 45 percent. Diagnosis — congestive heart failure. Prescribe furosemide 40 mg once daily and ramipril 5 mg once daily. Ask to monitor weight daily and restrict salt intake.",
+    "expected": {
+      "Allergy": ["Not mentioned"],
+      "Complaints_Presented": "Shortness of breath on exertion and pedal edema",
+      "Diagnosis": "Congestive heart failure",
+      "Rx": [
+        {"Medication": "Furosemide", "Dosage": "40 mg", "Frequency": "Once daily", "Duration": "Not mentioned"},
+        {"Medication": "Ramipril", "Dosage": "5 mg", "Frequency": "Once daily", "Duration": "Not mentioned"}
+      ],
+      "History": "Diabetes and hypertension",
+      "Advice_FollowUp": "Monitor weight daily and restrict salt intake"
+    }
+  },
+  {
+    "id": 3,
+    "notes": "Patient came with palpitations and dizziness. No history of hypertension or diabetes. ECG shows atrial fibrillation. Prescribe metoprolol 25 mg twice daily. Advise to avoid caffeine and stress, follow up in two weeks.",
+    "expected": {
+      "Allergy": ["Not mentioned"],
+      "Complaints_Presented": "Palpitations and dizziness",
+      "Diagnosis": "Atrial fibrillation",
+      "Rx": [
+        {"Medication": "Metoprolol", "Dosage": "25 mg", "Frequency": "Twice daily", "Duration": "Not mentioned"}
+      ],
+      "History": "No hypertension or diabetes",
+      "Advice_FollowUp": "Avoid caffeine and stress, follow up in two weeks"
+    }
+  },
+  {
+    "id": 4,
+    "notes": "Patient with previous myocardial infarction now complains of mild chest discomfort on exertion. On regular statins. ECG normal. Continue current medication, advise exercise and dietary modification.",
+    "expected": {
+      "Allergy": ["Not mentioned"],
+      "Complaints_Presented": "Mild chest discomfort on exertion",
+      "Diagnosis": "Stable ischemic heart disease",
+      "Rx": [],
+      "History": "Previous myocardial infarction, on regular statins",
+      "Advice_FollowUp": "Continue medication, exercise, and dietary modification"
+    }
+  },
+  {
+    "id": 5,
+    "notes": "Patient reports occasional skipped beats and mild breathlessness. Has hypothyroidism. ECG shows premature ventricular complexes. Prescribe bisoprolol 5 mg once daily. Recheck thyroid function next visit.",
+    "expected": {
+      "Allergy": ["Not mentioned"],
+      "Complaints_Presented": "Skipped beats and mild breathlessness",
+      "Diagnosis": "Premature ventricular complexes",
+      "Rx": [
+        {"Medication": "Bisoprolol", "Dosage": "5 mg", "Frequency": "Once daily", "Duration": "Not mentioned"}
+      ],
+      "History": "Hypothyroidism",
+      "Advice_FollowUp": "Recheck thyroid function next visit"
+    }
+  },
+  {
+    "id": 6,
+    "notes": "Patient presents with chest heaviness on climbing stairs. Has history of diabetes and smoking. ECG normal. Prescribe clopidogrel 75 mg once daily. Advise to quit smoking and control blood sugar.",
+    "expected": {
+      "Allergy": ["Not mentioned"],
+      "Complaints_Presented": "Chest heaviness on exertion",
+      "Diagnosis": "Stable angina",
+      "Rx": [
+        {"Medication": "Clopidogrel", "Dosage": "75 mg", "Frequency": "Once daily", "Duration": "Not mentioned"}
+      ],
+      "History": "Diabetes and smoking",
+      "Advice_FollowUp": "Quit smoking and control blood sugar"
+    }
+  },
+  {
+    "id": 7,
+    "notes": "Patient complains of swelling in both legs and breathlessness while lying down. Known case of hypertension. Diagnosis — congestive cardiac failure. Prescribe furosemide 40 mg once daily and spironolactone 25 mg once daily. Advise salt restriction and follow up in 5 days.",
+    "expected": {
+      "Allergy": ["Not mentioned"],
+      "Complaints_Presented": "Swelling in both legs and breathlessness while lying down",
+      "Diagnosis": "Congestive cardiac failure",
+      "Rx": [
+        {"Medication": "Furosemide", "Dosage": "40 mg", "Frequency": "Once daily", "Duration": "Not mentioned"},
+        {"Medication": "Spironolactone", "Dosage": "25 mg", "Frequency": "Once daily", "Duration": "Not mentioned"}
+      ],
+      "History": "Hypertension",
+      "Advice_FollowUp": "Restrict salt and follow up in 5 days"
+    }
+  },
+  {
+    "id": 8,
+    "notes": "Patient with history of coronary artery bypass graft presents for regular check-up. No fresh complaints. Continue aspirin 75 mg and atorvastatin 10 mg daily. Advise regular walking and low-fat diet.",
+    "expected": {
+      "Allergy": ["Not mentioned"],
+      "Complaints_Presented": "No complaints, routine check-up",
+      "Diagnosis": "Post coronary artery bypass graft follow-up",
+      "Rx": [
+        {"Medication": "Aspirin", "Dosage": "75 mg", "Frequency": "Once daily", "Duration": "Not mentioned"},
+        {"Medication": "Atorvastatin", "Dosage": "10 mg", "Frequency": "Once daily", "Duration": "Not mentioned"}
+      ],
+      "History": "Coronary artery bypass graft",
+      "Advice_FollowUp": "Regular walking and low-fat diet"
+    }
+  },
+  {
+    "id": 9,
+    "notes": "Patient reports chest pain after meals and mild bloating. ECG and echo normal. Diagnosis — non-cardiac chest pain likely due to gastritis. Prescribe pantoprazole 40 mg once daily for 7 days.",
+    "expected": {
+      "Allergy": ["Not mentioned"],
+      "Complaints_Presented": "Chest pain after meals and bloating",
+      "Diagnosis": "Non-cardiac chest pain due to gastritis",
+      "Rx": [
+        {"Medication": "Pantoprazole", "Dosage": "40 mg", "Frequency": "Once daily", "Duration": "7 days"}
+      ],
+      "History": "Not mentioned",
+      "Advice_FollowUp": "Review after 1 week if symptoms persist"
+    }
+  },
+  {
+    "id": 10,
+    "notes": "Patient complains of fatigue and shortness of breath. Blood tests show hemoglobin 9 g per dl. ECG normal. Diagnosis — anemia-related fatigue. Prescribe iron supplements once daily for 30 days.",
+    "expected": {
+      "Allergy": ["Not mentioned"],
+      "Complaints_Presented": "Fatigue and shortness of breath",
+      "Diagnosis": "Anemia-related fatigue",
+      "Rx": [
+        {"Medication": "Iron supplement", "Dosage": "Not mentioned", "Frequency": "Once daily", "Duration": "30 days"}
+      ],
+      "History": "Not mentioned",
+      "Advice_FollowUp": "Follow up after 30 days"
+    }
+  }
+]
