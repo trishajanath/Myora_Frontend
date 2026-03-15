@@ -47,6 +47,9 @@ class AuditAction:
     OCR_SAVE = "OCR_SAVE"
     OCR_VIEW = "OCR_VIEW"
 
+    # Drug safety
+    DRUG_SAFETY_CHECK = "DRUG_SAFETY_CHECK"
+
 
 def log_audit(action: str, patient_id: str = None, details: dict = None,
               user: str = "system", success: bool = True):
@@ -90,4 +93,4 @@ def log_audit(action: str, patient_id: str = None, details: dict = None,
         audit_collection.insert_one(entry)
     except Exception as e:
         # Audit logging must never crash the main application
-        print(f"⚠️  Audit log write failed: {e}")
+        print(f"Audit log write failed: {e}")

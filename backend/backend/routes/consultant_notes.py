@@ -17,6 +17,13 @@ import google.generativeai as genai
 from config import Config
 from db import db
 from audit import log_audit, AuditAction
+from utils.ocr_quality import (
+    score_image_quality,
+    adaptive_enhance,
+    get_enhancement_strategies,
+    apply_enhancement_strategy,
+    detect_document_regions,
+)
 
 # ---------------- Configuration ----------------
 consultant_bp = Blueprint("consultant_bp", __name__)
@@ -99,12 +106,18 @@ def prepare_original_image(img: Image.Image) -> Image.Image:
     return img
 
 
-def extract_medical_notes_from_image(img: Image.Image):
+def extract_medical_notes_from_image(img: Image.Image, quality_report: dict = None):
     """Extract structured data from any medical document image using Gemini.
-    Sends both the original and a preprocessed version for cross-referencing."""
+    Uses quality-aware adaptive enhancement + multi-pass OCR strategy.
+    Sends both the original and an enhanced version for cross-referencing."""
 
     original = prepare_original_image(img)
-    enhanced = preprocess_image(img)
+
+    # Use adaptive enhancement if quality report is available
+    if quality_report:
+        enhanced = adaptive_enhance(img, quality_report)
+    else:
+        enhanced = preprocess_image(img)
 
     prompt = """You are an expert medical document OCR specialist with years of experience reading doctors' handwriting with extremely high accuracy.
 
@@ -240,7 +253,8 @@ def merge_day_data(existing_data, new_data):
 def extract_notes():
     """
     POST: Extract day-wise consultant notes from uploaded images.
-    Does NOT save to DB.
+    Now includes quality scoring, adaptive enhancement, multi-pass OCR,
+    and region-of-interest detection. Does NOT save to DB.
     """
     try:
         if "files" not in request.files:
@@ -248,23 +262,91 @@ def extract_notes():
 
         images = request.files.getlist("files")
         all_extracted_data = {}
+        quality_reports = []
+        region_data = []
 
         for img_file in images:
             img = Image.open(img_file.stream)
             if img.mode not in ("RGB", "L"):
                 img = img.convert("RGB")
 
-            extracted = extract_medical_notes_from_image(img)
+            # ── Step 1: Quality scoring ──
+            quality_report = score_image_quality(img)
+            quality_reports.append({
+                "filename": img_file.filename,
+                **quality_report,
+            })
+            print(f"Image quality: {quality_report['quality_rating']} "
+                  f"({quality_report['overall_score']}/100)")
+
+            # ── Step 2: Region-of-interest detection ──
+            regions = detect_document_regions(img)
+            region_data.append({
+                "filename": img_file.filename,
+                "regions": regions,
+            })
+
+            # ── Step 3: Adaptive enhancement + extraction ──
+            extracted = extract_medical_notes_from_image(img, quality_report)
+
+            # ── Step 4: Multi-pass OCR for poor quality images ──
+            if quality_report["overall_score"] < 60:
+                print("Low quality image -- attempting multi-pass OCR")
+                strategies = get_enhancement_strategies(quality_report)
+                best_result = extracted
+                best_section_count = len(extracted.get("sections", []))
+
+                for strategy in strategies[1:]:  # Skip first (already done)
+                    try:
+                        alt_enhanced = apply_enhancement_strategy(
+                            img, strategy["name"], quality_report
+                        )
+                        alt_img_pil = alt_enhanced
+                        alt_original = prepare_original_image(img)
+
+                        alt_response = GEMINI_MODEL.generate_content(
+                            [alt_original, alt_img_pil,
+                             "Extract all text from this medical document as structured JSON. "
+                             "Return ONLY valid JSON with keys: document_type, patient_info, "
+                             "sections, investigations, diagnosis, prescription, notes."],
+                            generation_config={
+                                "temperature": 0.1,
+                                "max_output_tokens": 16384,
+                            },
+                        )
+                        if alt_response and alt_response.text:
+                            alt_json = clean_json_response(alt_response.text)
+                            if alt_json:
+                                alt_data = json.loads(alt_json)
+                                alt_sections = len(alt_data.get("sections", []))
+                                if alt_sections > best_section_count:
+                                    best_result = alt_data
+                                    best_section_count = alt_sections
+                                    print(f"  Strategy '{strategy['name']}' "
+                                          f"found {alt_sections} sections (better)")
+                    except Exception as strat_err:
+                        print(f"  Strategy '{strategy['name']}' failed: {strat_err}")
+
+                extracted = best_result
+
             all_extracted_data = merge_day_data(all_extracted_data, extracted)
 
         log_audit(
             AuditAction.OCR_EXTRACT,
-            details={"images_count": len(images), "document_type": all_extracted_data.get("document_type")},
+            details={
+                "images_count": len(images),
+                "document_type": all_extracted_data.get("document_type"),
+                "avg_quality": round(
+                    sum(q["overall_score"] for q in quality_reports) / max(len(quality_reports), 1), 1
+                ),
+            },
         )
 
         return jsonify({
             "message": "Extraction successful",
-            "extracted_json": all_extracted_data
+            "extracted_json": all_extracted_data,
+            "quality_reports": quality_reports,
+            "regions": region_data,
         })
 
     except Exception as e:

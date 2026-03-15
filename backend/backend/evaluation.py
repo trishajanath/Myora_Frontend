@@ -173,7 +173,7 @@ for item in test_data:
     overall = (field_acc + med_acc + (sum(embed_scores) / len(embed_scores))) / 3
     overall_accs.append(overall * 100)
 
-    print(f"Sample {item.get('id')} → FieldAcc {field_acc*100:.2f}% | MedAcc {med_acc*100:.2f}% | StrSim {(sum(sim_scores)/len(sim_scores))*100:.2f}% | EmbedSim {(sum(embed_scores)/len(embed_scores))*100:.2f}% | Overall {overall*100:.2f}%")
+    print(f"Sample {item.get('id')} -> FieldAcc {field_acc*100:.2f}% | MedAcc {med_acc*100:.2f}% | StrSim {(sum(sim_scores)/len(sim_scores))*100:.2f}% | EmbedSim {(sum(embed_scores)/len(embed_scores))*100:.2f}% | Overall {overall*100:.2f}%")
 
 # --- Print averages ---
 print("\n=== AVERAGE SCORES ===")

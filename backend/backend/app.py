@@ -15,20 +15,22 @@ from config import Config
 
 app = Flask(__name__)
 
-# ✅ Allow CORS for your frontend and admin URLs
+# Allow CORS for your frontend and admin URLs
 CORS(app, origins=["http://localhost:5173", "http://localhost:5174"])
 
-# ✅ Import and register blueprints
+# Import and register blueprints
 from routes.patients import patients_bp
 from routes.voice_routes import voice_bp
 from routes.consultant_notes import consultant_bp
+from routes.drug_safety_routes import drug_safety_bp
 
 app.register_blueprint(patients_bp, url_prefix="/api/patients")
 app.register_blueprint(voice_bp, url_prefix="/api/voice")
 app.register_blueprint(consultant_bp, url_prefix="/api/consultant")
+app.register_blueprint(drug_safety_bp, url_prefix="/api/drug-safety")
 
 
-# ✅ Audit log viewer endpoint
+# Audit log viewer endpoint
 @app.route("/api/audit", methods=["GET"])
 def get_audit_logs():
     """Retrieve audit log entries. Query params: patient_id, action, limit."""
@@ -57,7 +59,7 @@ def get_audit_logs():
 @app.route("/")
 def index():
     return jsonify({
-        "message": "🩺 IMRS Backend Active",
+        "message": "IMRS Backend Active",
         "version": "2.0",
         "voice_api": "Deepgram",
         "endpoints": {
@@ -87,21 +89,22 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "5001"))
 
     print("\n" + "="*70)
-    print("🚀 IMSR Backend Starting...")
+    print("IMSR Backend Starting...")
     print("="*70)
-    print(f"📍 API Server: http://0.0.0.0:{port}")
-    print(f"🌐 CORS Origins: http://localhost:5173, http://localhost:5174")
-    print(f"🎙️  Voice Transcription: /api/voice/transcribe (Deepgram)")
-    print(f"🤖 AI Processing: /api/voice/process (Gemini)")
-    print(f"💾 Save EMR: /api/voice/save")
-    print(f"📋 Consultant Notes: /api/consultant")
+    print(f"API Server: http://0.0.0.0:{port}")
+    print(f"CORS Origins: http://localhost:5173, http://localhost:5174")
+    print(f"Voice Transcription: /api/voice/transcribe (Deepgram)")
+    print(f"AI Processing: /api/voice/process (Gemini)")
+    print(f"Save EMR: /api/voice/save")
+    print(f"Consultant Notes: /api/consultant")
+    print(f"Drug Safety: /api/drug-safety")
     print("="*70)
     
     # Validate configuration
     if Config.validate():
-        print("✅ Configuration valid\n")
+        print("Configuration valid\n")
     else:
-        print("❌ Configuration incomplete - check .env file\n")
+        print("Configuration incomplete - check .env file\n")
         exit(1)
     
     app.run(

@@ -17,11 +17,11 @@ try:
     
     # Test connection
     client.admin.command('ping')
-    print("✅ MongoDB connected successfully")
+    print("MongoDB connected successfully")
     
 except ServerSelectionTimeoutError as e:
-    print(f"❌ MongoDB connection failed: {e}")
-    print("⚠️  Make sure MongoDB is running!")
+    print(f"MongoDB connection failed: {e}")
+    print("Make sure MongoDB is running!")
     sys.exit(1)
 
 # Database
@@ -29,7 +29,7 @@ db = client["imsr_db"]
 
 # Collections
 inpatients = db["inpatients"]
-emr_collection = db["emr_records"]  # ✅ Collection for voice EMR structured notes
-consultant_notes = db["consultant_notes"]  # ✅ Collection for consultant notes
-audit_logs = db["audit_logs"]  # ✅ HIPAA audit trail
+emr_collection = db["emr_records"]  # Collection for voice EMR structured notes
+consultant_notes = db["consultant_notes"]  # Collection for consultant notes
+audit_logs = db["audit_logs"]  # HIPAA audit trail
 users = db["users"]

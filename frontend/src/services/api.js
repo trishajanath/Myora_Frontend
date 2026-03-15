@@ -101,3 +101,15 @@ export const auditAPI = {
     return response.data;
   },
 };
+
+export const drugSafetyAPI = {
+  check: async ({ allergies, medications, diagnosis, patient_id }) => {
+    const response = await axios.post(`${API_BASE_URL}/drug-safety/check`, {
+      allergies,
+      medications,
+      diagnosis,
+      patient_id,
+    });
+    return response.data;
+  },
+};

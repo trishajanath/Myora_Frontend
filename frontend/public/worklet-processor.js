@@ -21,7 +21,7 @@ class AudioProcessor extends AudioWorkletProcessor {
       const buffer = new ArrayBuffer(block.length * 2);
       const view = new DataView(buffer);
 
-      // Convert Float32 [-1, 1] → Int16 PCM
+      // Convert Float32 [-1, 1] to Int16 PCM
       for (let i = 0; i < block.length; i++) {
         let s = Math.max(-1, Math.min(1, block[i]));
         view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);

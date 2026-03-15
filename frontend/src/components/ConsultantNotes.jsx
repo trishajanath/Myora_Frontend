@@ -12,6 +12,8 @@ export default function ConsultantNotes({ selectedPatient }) {
   const [editMode, setEditMode] = useState(false);
   const [pastNotes, setPastNotes] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [qualityReports, setQualityReports] = useState([]);
+  const [regions, setRegions] = useState([]);
 
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
@@ -19,6 +21,8 @@ export default function ConsultantNotes({ selectedPatient }) {
     setPreviews(selected.map((f) => URL.createObjectURL(f)));
     setStructured(null);
     setError("");
+    setQualityReports([]);
+    setRegions([]);
   };
 
   const handleUpload = async () => {
@@ -28,6 +32,8 @@ export default function ConsultantNotes({ selectedPatient }) {
     try {
       const res = await consultantAPI.extractNotes(files);
       setStructured(res.extracted_json);
+      if (res.quality_reports) setQualityReports(res.quality_reports);
+      if (res.regions) setRegions(res.regions);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
@@ -202,6 +208,82 @@ export default function ConsultantNotes({ selectedPatient }) {
             <div className="extracting-indicator">
               <div className="spinner" />
               <span>AI is reading the document...</span>
+            </div>
+          )}
+
+          {/* Image Quality Reports */}
+          {qualityReports.length > 0 && (
+            <div className="quality-reports-section">
+              <h3 className="quality-section-title">
+                Image Quality Analysis
+              </h3>
+              {qualityReports.map((report, idx) => (
+                <div key={idx} className={`quality-card quality-${report.quality_rating}`}>
+                  <div className="quality-card-header">
+                    <span className="quality-filename">{report.filename || `Image ${idx + 1}`}</span>
+                    <div className="quality-score-pill">
+                      <span className={`quality-dot ${report.quality_rating}`} />
+                      {report.overall_score}/100 — {report.quality_rating}
+                    </div>
+                  </div>
+                  <div className="quality-metrics">
+                    <div className="quality-metric">
+                      <span className="metric-label">Sharpness</span>
+                      <div className="metric-bar-track">
+                        <div
+                          className={`metric-bar-fill ${report.blur?.label}`}
+                          style={{ width: `${report.blur?.score || 0}%` }}
+                        />
+                      </div>
+                      <span className="metric-value">{report.blur?.label}</span>
+                    </div>
+                    <div className="quality-metric">
+                      <span className="metric-label">Contrast</span>
+                      <div className="metric-bar-track">
+                        <div
+                          className={`metric-bar-fill ${report.contrast?.label}`}
+                          style={{ width: `${report.contrast?.score || 0}%` }}
+                        />
+                      </div>
+                      <span className="metric-value">{report.contrast?.label}</span>
+                    </div>
+                    <div className="quality-metric">
+                      <span className="metric-label">Brightness</span>
+                      <div className="metric-bar-track">
+                        <div
+                          className={`metric-bar-fill ${report.brightness?.label === 'good' ? 'good' : 'low'}`}
+                          style={{ width: `${report.brightness?.score || 0}%` }}
+                        />
+                      </div>
+                      <span className="metric-value">{report.brightness?.label}</span>
+                    </div>
+                    <div className="quality-metric">
+                      <span className="metric-label">Resolution</span>
+                      <div className="metric-bar-track">
+                        <div
+                          className="metric-bar-fill good"
+                          style={{ width: `${report.resolution?.score || 0}%` }}
+                        />
+                      </div>
+                      <span className="metric-value">{report.resolution?.rating}</span>
+                    </div>
+                  </div>
+                  {report.issues?.length > 0 && (
+                    <div className="quality-issues">
+                      {report.issues.map((issue, i) => (
+                        <div key={i} className="quality-issue">{issue}</div>
+                      ))}
+                    </div>
+                  )}
+                  {report.recommendations?.length > 0 && (
+                    <div className="quality-recommendations">
+                      {report.recommendations.map((rec, i) => (
+                        <div key={i} className="quality-rec">{rec}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 

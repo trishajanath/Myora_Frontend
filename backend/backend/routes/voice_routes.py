@@ -3,6 +3,7 @@ import google.generativeai as genai
 from config import Config
 from db import emr_collection
 from audit import log_audit, AuditAction
+from utils.drug_safety import run_full_safety_check
 from datetime import datetime
 import json
 import re
@@ -16,7 +17,7 @@ gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 deepgram = DeepgramClient(Config.DEEPGRAM_API_KEY)
 
 # -----------------------------
-# 🎤 AUDIO TRANSCRIPTION ROUTE
+# AUDIO TRANSCRIPTION ROUTE
 # -----------------------------
 @voice_bp.route('/transcribe', methods=['POST'])
 def transcribe_audio():
@@ -73,8 +74,8 @@ def transcribe_audio():
         # ─── Post-processing: fix common medical misrecognitions ───
         transcript = _post_process_medical_transcript(transcript)
 
-        print(f"✅ Transcription complete (confidence: {confidence:.2%})")
-        print(f"📝 Transcript: {transcript[:100]}...")
+        print(f"Transcription complete (confidence: {confidence:.2%})")
+        print(f"Transcript: {transcript[:100]}...")
 
         log_audit(
             AuditAction.VOICE_TRANSCRIBE,
@@ -90,13 +91,13 @@ def transcribe_audio():
         })
 
     except Exception as e:
-        print(f"❌ Transcription Error: {e}")
+        print(f"Transcription Error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 # -----------------------------
-# 🤖 GEMINI NOTE PROCESSOR
+# GEMINI NOTE PROCESSOR
 # -----------------------------
 @voice_bp.route('/process', methods=['POST'])
 def process_notes():
@@ -110,8 +111,8 @@ def process_notes():
             return jsonify({"error": "Notes too short"}), 400
 
         print(f"\n{'='*60}")
-        print(f"🤖 Processing notes for: {patient_id}")
-        print(f"📝 Notes length: {len(notes)} chars")
+        print(f"Processing notes for: {patient_id}")
+        print(f"Notes length: {len(notes)} chars")
         print(f"{'='*60}\n")
 
         prompt = f"""You are a senior clinical documentation specialist. Your task is to convert 
@@ -155,12 +156,12 @@ Return the JSON now.
 
         response = gemini_model.generate_content(prompt)
 
-        # ✅ Clean Gemini response
+        # Clean Gemini response
         cleaned = response.text.strip()
         cleaned = re.sub(r'```json\s*|\s*```', '', cleaned, flags=re.IGNORECASE | re.MULTILINE)
         structured = json.loads(cleaned)
 
-        # ✅ Ensure all expected fields exist
+        # Ensure all expected fields exist
         default_fields = {
             "Allergy": [],
             "Complaints_Presented": "",
@@ -173,7 +174,22 @@ Return the JSON now.
         for key, default in default_fields.items():
             structured.setdefault(key, default)
 
-        print("✅ Structured data generated successfully")
+        print("Structured data generated successfully")
+
+        # Auto-run drug safety checks
+        safety_report = None
+        try:
+            allergies = structured.get("Allergy", [])
+            medications = structured.get("Rx", [])
+            diagnosis = structured.get("Diagnosis", "")
+            if medications:
+                safety_report = run_full_safety_check(allergies, medications, diagnosis)
+                if safety_report["alert_count"] > 0:
+                    print(f"Drug safety: {safety_report['alert_count']} alert(s) found")
+                else:
+                    print("Drug safety: No alerts")
+        except Exception as safety_err:
+            print(f"Drug safety check failed (non-blocking): {safety_err}")
 
         log_audit(
             AuditAction.VOICE_PROCESS,
@@ -181,21 +197,25 @@ Return the JSON now.
             details={"notes_length": len(notes), "fields": list(structured.keys())},
         )
 
-        return jsonify({"success": True, "structured": structured})
+        return jsonify({
+            "success": True,
+            "structured": structured,
+            "safety_report": safety_report,
+        })
 
     except json.JSONDecodeError as e:
-        print(f"❌ JSON Parse Error: {e}")
+        print(f"JSON Parse Error: {e}")
         return jsonify({"error": "Invalid JSON from AI"}), 500
 
     except Exception as e:
-        print(f"❌ Processing Error: {e}")
+        print(f"Processing Error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
 # -----------------------------
-# 💾 SAVE NOTE TO MONGODB
+# SAVE NOTE TO MONGODB
 # -----------------------------
 @voice_bp.route('/save', methods=['POST'])
 def save_note():
@@ -226,7 +246,7 @@ def save_note():
 
         result = emr_collection.insert_one(emr_doc)
 
-        print(f"✅ EMR saved for patient {patient_id} with ID {result.inserted_id}")
+        print(f"EMR saved for patient {patient_id} with ID {result.inserted_id}")
 
         log_audit(
             AuditAction.EMR_SAVE,
@@ -242,14 +262,14 @@ def save_note():
         })
 
     except Exception as e:
-        print(f"❌ Save Error: {e}")
+        print(f"Save Error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
 # -----------------------------
-# 📜 HISTORY FETCH
+# HISTORY FETCH
 # -----------------------------
 @voice_bp.route('/history/<patient_id>', methods=['GET'])
 def get_patient_history(patient_id):
@@ -272,12 +292,12 @@ def get_patient_history(patient_id):
 
         return jsonify({"success": True, "notes": notes, "count": len(notes)})
     except Exception as e:
-        print(f"❌ History Error: {e}")
+        print(f"History Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
 # -----------------------------
-# 🩺 HEALTH CHECK
+# HEALTH CHECK
 # -----------------------------
 @voice_bp.route('/health', methods=['GET'])
 def voice_health():
@@ -291,7 +311,7 @@ def voice_health():
 
 
 # -------------------------------------------
-# 🔧 MEDICAL TRANSCRIPT POST-PROCESSING
+# MEDICAL TRANSCRIPT POST-PROCESSING
 # -------------------------------------------
 
 # Common medical misrecognitions from speech-to-text

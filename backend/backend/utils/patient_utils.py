@@ -30,7 +30,7 @@ def delete_patient(identifier):
         return {"status": "error", "message": str(e)}
 
 
-# ✅ Utility to edit patient details
+# Utility to edit patient details
 def edit_patient(identifier, new_data):
     """
     identifier: patient name (string)

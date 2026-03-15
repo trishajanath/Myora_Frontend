@@ -13,6 +13,7 @@ function VoiceRecorder({ selectedPatient, onNoteSaved }) {
   const [editedData, setEditedData] = useState(null);
   const [audioLevel, setAudioLevel] = useState(0);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [safetyReport, setSafetyReport] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -46,6 +47,7 @@ function VoiceRecorder({ selectedPatient, onNoteSaved }) {
       setEditMode(false);
       setConfidence(0);
       setRecordingTime(0);
+      setSafetyReport(null);
       audioChunksRef.current = [];
       
       addLog(`Starting recording for ${selectedPatient.name}`, "success");
@@ -232,6 +234,16 @@ function VoiceRecorder({ selectedPatient, onNoteSaved }) {
       setEditedData(result.structured);
       setStatus("EMR data ready! Review and save.");
       addLog("Structured data generated", "success");
+
+      // Capture drug safety report if returned
+      if (result.safety_report) {
+        setSafetyReport(result.safety_report);
+        if (result.safety_report.alert_count > 0) {
+          addLog(`Drug safety: ${result.safety_report.alert_count} alert(s)`, "error");
+        } else {
+          addLog("Drug safety: No alerts", "success");
+        }
+      }
     } catch (err) {
       addLog(`AI Error: ${err.message}`, "error");
       setStatus(`AI Error: ${err.message}`);
@@ -281,6 +293,7 @@ function VoiceRecorder({ selectedPatient, onNoteSaved }) {
       setEditMode(false);
       setConfidence(0);
       setRecordingTime(0);
+      setSafetyReport(null);
       
       onNoteSaved?.();
     } catch (err) {
@@ -389,6 +402,64 @@ function VoiceRecorder({ selectedPatient, onNoteSaved }) {
               <div className="transcription-content">
                 {transcription}
               </div>
+            </div>
+          )}
+
+          {/* Drug Safety Alerts */}
+          {safetyReport && safetyReport.alert_count > 0 && (
+            <div className="safety-alerts-section">
+              <div className="safety-header">
+                <h3>
+                  <span className="safety-icon">!</span>
+                  Drug Safety Alerts ({safetyReport.alert_count})
+                </h3>
+                <div className="severity-badges">
+                  {safetyReport.severity_summary.critical > 0 && (
+                    <span className="severity-badge critical">
+                      {safetyReport.severity_summary.critical} Critical
+                    </span>
+                  )}
+                  {safetyReport.severity_summary.high > 0 && (
+                    <span className="severity-badge high">
+                      {safetyReport.severity_summary.high} High
+                    </span>
+                  )}
+                  {safetyReport.severity_summary.moderate > 0 && (
+                    <span className="severity-badge moderate">
+                      {safetyReport.severity_summary.moderate} Moderate
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="safety-alerts-list">
+                {safetyReport.alerts.map((alert, idx) => (
+                  <div key={idx} className={`safety-alert-card ${alert.severity}`}>
+                    <div className="alert-type-badge">
+                      {alert.type === "allergy_conflict" && "Allergy Conflict"}
+                      {alert.type === "allergy_cross_reactivity" && "Cross-Reactivity"}
+                      {alert.type === "drug_interaction" && "Drug Interaction"}
+                      {alert.type === "duplicate_therapy" && "Duplicate Therapy"}
+                      {alert.type === "contraindication" && "Contraindication"}
+                    </div>
+                    <div className="alert-message">{alert.message}</div>
+                    <div className="alert-details">
+                      {alert.medication && <span>Drug: {alert.medication}</span>}
+                      {alert.allergy && <span>Allergy: {alert.allergy}</span>}
+                      {alert.drug_a && alert.drug_b && (
+                        <span>{alert.drug_a} / {alert.drug_b}</span>
+                      )}
+                      {alert.drug_class && <span>Class: {alert.drug_class}</span>}
+                      {alert.condition && <span>Condition: {alert.condition}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {safetyReport && safetyReport.alert_count === 0 && structuredData && (
+            <div className="safety-clear-banner">
+              <span>OK</span> Drug safety check passed — no interactions or allergy conflicts detected
             </div>
           )}
 

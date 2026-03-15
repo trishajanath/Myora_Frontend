@@ -36,10 +36,10 @@ class Config:
             errors.append("MONGO_URI not set")
         
         if errors:
-            print("\n❌ Configuration Errors:")
+            print("\nConfiguration Errors:")
             for error in errors:
                 print(f"   - {error}")
-            print("\n📝 Create a .env file with:")
+            print("\nCreate a .env file with:")
             print("   GEMINI_API_KEY=your_key_here")
             print("   DEEPGRAM_API_KEY=your_key_here")
             print("   MONGO_URI=mongodb://localhost:27017/")
@@ -48,7 +48,7 @@ class Config:
         
         # Warn about HIPAA compliance
         if not cls.HIPAA_BAA_SIGNED:
-            print("\n⚠️  WARNING: HIPAA BAA not marked as signed!")
+            print("\nWARNING: HIPAA BAA not marked as signed!")
             print("   Do not use in production without signing BAA with Deepgram")
             print("   Contact: support@deepgram.com\n")
         
