@@ -99,6 +99,14 @@ export default function ConsultantNotes({ selectedPatient }) {
           </div>
         )}
 
+        {/* Primary transcription output */}
+        {data.transcribed_text && (
+          <div className="ocr-card highlight-blue">
+            <h4>Transcribed Text</h4>
+            <div className="section-content">{data.transcribed_text}</div>
+          </div>
+        )}
+
         {/* Sections */}
         {data.sections?.length > 0 && (
           <div className="ocr-card">
@@ -109,6 +117,21 @@ export default function ConsultantNotes({ selectedPatient }) {
                 <div className="section-content">{sec.content}</div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Fallback Transcription */}
+        {(!data.sections?.length && data.notes) && (
+          <div className="ocr-card">
+            <h4>Transcribed Text</h4>
+            <div className="section-content">{data.notes}</div>
+          </div>
+        )}
+
+        {data.raw_text && (
+          <div className="ocr-card">
+            <h4>Raw OCR Text</h4>
+            <div className="section-content">{data.raw_text}</div>
           </div>
         )}
 

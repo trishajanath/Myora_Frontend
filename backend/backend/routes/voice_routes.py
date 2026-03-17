@@ -7,14 +7,21 @@ from utils.drug_safety import run_full_safety_check
 from datetime import datetime
 import json
 import re
-from deepgram import DeepgramClient, PrerecordedOptions
+
+try:
+    from deepgram import DeepgramClient, PrerecordedOptions
+    _deepgram_import_error = None
+except (SyntaxError, ImportError) as exc:
+    DeepgramClient = None
+    PrerecordedOptions = None
+    _deepgram_import_error = str(exc)
 
 voice_bp = Blueprint('voice', __name__)
 
 # Initialize clients
 genai.configure(api_key=Config.GEMINI_API_KEY)
 gemini_model = genai.GenerativeModel("gemini-2.0-flash")
-deepgram = DeepgramClient(Config.DEEPGRAM_API_KEY)
+deepgram = DeepgramClient(Config.DEEPGRAM_API_KEY) if DeepgramClient else None
 
 # -----------------------------
 # AUDIO TRANSCRIPTION ROUTE
@@ -23,6 +30,13 @@ deepgram = DeepgramClient(Config.DEEPGRAM_API_KEY)
 def transcribe_audio():
     """Transcribe audio using Deepgram."""
     try:
+        if not deepgram or not PrerecordedOptions:
+            return jsonify({
+                "error": "Deepgram SDK is unavailable in this Python environment.",
+                "details": _deepgram_import_error,
+                "hint": "Use Python 3.10+ for deepgram-sdk v3, or install a Python 3.9 compatible Deepgram SDK."
+            }), 500
+
         # Ensure audio file is sent
         if 'audio_data' not in request.files:
             return jsonify({"error": "No audio file provided"}), 400
@@ -303,9 +317,10 @@ def get_patient_history(patient_id):
 def voice_health():
     """Check Deepgram API health."""
     return jsonify({
-        "success": True,
+        "success": bool(deepgram and PrerecordedOptions),
         "service": "deepgram",
-        "status": "operational",
+        "status": "operational" if (deepgram and PrerecordedOptions) else "degraded",
+        "import_error": _deepgram_import_error,
         "model": "nova-2-medical"
     })
 

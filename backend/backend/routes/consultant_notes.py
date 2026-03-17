@@ -14,6 +14,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 import google.generativeai as genai
+from google.api_core.exceptions import DeadlineExceeded
 from config import Config
 from db import db
 from audit import log_audit, AuditAction
@@ -119,6 +120,37 @@ def extract_medical_notes_from_image(img: Image.Image, quality_report: dict = No
     else:
         enhanced = preprocess_image(img)
 
+    def extract_plain_text_fallback():
+        """Fallback OCR path that returns plain transcribed text."""
+        fallback_prompt = """Transcribe all visible handwritten and printed text from this medical document.
+Rules:
+- Return plain text only (no JSON, no markdown).
+- Do NOT comment on image quality.
+- Keep line breaks where possible.
+- If a word is unclear, write best guess and add [?]."""
+
+        for attempt in range(2):
+            try:
+                fallback_response = GEMINI_MODEL.generate_content(
+                    [original, enhanced, fallback_prompt],
+                    generation_config={
+                        "temperature": 0.1,
+                        "max_output_tokens": 4096,
+                    },
+                )
+                text = (fallback_response.text or "").strip() if fallback_response else ""
+                if text:
+                    return text
+            except DeadlineExceeded:
+                if attempt == 1:
+                    return ""
+                print("Plain-text OCR fallback timed out; retrying...")
+            except Exception as fallback_err:
+                print(f"Plain-text OCR fallback failed: {fallback_err}")
+                return ""
+
+        return ""
+
     prompt = """You are an expert medical document OCR specialist with years of experience reading doctors' handwriting with extremely high accuracy.
 
 **IMAGES PROVIDED:**
@@ -149,6 +181,7 @@ Carefully read this medical document image. It likely contains handwritten text 
 8. If a word is STILL unclear after checking both images, write your best reading and add [?] after it.
 9. NEVER output random characters, Greek letters, or symbols. Always produce readable English text.
 10. For NUMBERS (vitals, doses, lab values): read each digit carefully. Distinguish 1/7, 3/8, 5/6, 0/6/9.
+11. Do NOT comment on image quality in the output. Transcribe what is visible. If unreadable, mark uncertain words with [?].
 
 **VERIFICATION STEP:**
 After your first reading, re-read each field and verify:
@@ -163,6 +196,7 @@ Correct any errors before producing the final output.
 2. Extract EVERY visible section, field, and value -- do not skip anything
 3. Preserve the structure (tables, rows, columns, sections)
 4. For tabular data, represent each row as a separate section entry
+5. Never replace transcription with quality commentary like "image blurry" or "illegible" as full section content.
 
 **OUTPUT FORMAT:**
 Return ONLY valid JSON (no text before or after):
@@ -192,16 +226,32 @@ Return ONLY valid JSON (no text before or after):
 Return ONLY the JSON, no explanations."""
 
     try:
+        response = None
+
         # Send both images for cross-referencing
-        response = GEMINI_MODEL.generate_content(
-            [original, enhanced, prompt],
-            generation_config={
-                "temperature": 0.1,
-                "max_output_tokens": 16384
-            }
-        )
+        for attempt in range(2):
+            try:
+                response = GEMINI_MODEL.generate_content(
+                    [original, enhanced, prompt],
+                    generation_config={
+                        "temperature": 0.1 if attempt == 0 else 0.2,
+                        "max_output_tokens": 16384 if attempt == 0 else 8192,
+                    }
+                )
+                break
+            except DeadlineExceeded:
+                if attempt == 1:
+                    raise
+                print("Gemini OCR timed out; retrying with lighter settings...")
 
         if not response or not response.text:
+            fallback_text = extract_plain_text_fallback()
+            if fallback_text:
+                return {
+                    "document_type": "medical_note",
+                    "sections": [{"title": "Transcribed Text", "content": fallback_text}],
+                    "notes": fallback_text,
+                }
             return {"document_type": "unknown", "sections": [], "error": "No response from model"}
 
         cleaned_json = clean_json_response(response.text)
@@ -219,9 +269,23 @@ Return ONLY the JSON, no explanations."""
                 cleaned_json = clean_json_response(response.text)
 
             if not cleaned_json:
+                fallback_text = extract_plain_text_fallback()
+                if fallback_text:
+                    return {
+                        "document_type": "medical_note",
+                        "sections": [{"title": "Transcribed Text", "content": fallback_text}],
+                        "notes": fallback_text,
+                    }
                 return {"document_type": "unknown", "sections": [], "raw_text": response.text if response else ""}
 
-        return json.loads(cleaned_json)
+        parsed = json.loads(cleaned_json)
+        if not parsed.get("sections"):
+            fallback_text = extract_plain_text_fallback()
+            if fallback_text:
+                parsed["sections"] = [{"title": "Transcribed Text", "content": fallback_text}]
+                parsed["notes"] = parsed.get("notes") or fallback_text
+
+        return parsed
 
     except Exception as e:
         print("Gemini extraction failed:", e)
@@ -245,7 +309,45 @@ def merge_day_data(existing_data, new_data):
             existing_sections.append(section)
 
     existing_data["sections"] = existing_sections
+    if not existing_data.get("notes") and new_data.get("notes"):
+        existing_data["notes"] = new_data.get("notes")
+    if not existing_data.get("raw_text") and new_data.get("raw_text"):
+        existing_data["raw_text"] = new_data.get("raw_text")
+    if not existing_data.get("transcribed_text") and new_data.get("transcribed_text"):
+        existing_data["transcribed_text"] = new_data.get("transcribed_text")
     return existing_data
+
+
+def _compose_transcribed_text(extracted: dict) -> str:
+    """Build a single display-friendly transcription string from extracted payload."""
+    if not extracted:
+        return ""
+
+    if extracted.get("transcribed_text"):
+        return str(extracted.get("transcribed_text")).strip()
+
+    section_lines = []
+    for sec in extracted.get("sections", []) or []:
+        title = str(sec.get("title", "")).strip()
+        content = str(sec.get("content", "")).strip()
+        if content:
+            if title:
+                section_lines.append(f"{title}:\n{content}")
+            else:
+                section_lines.append(content)
+
+    notes = str(extracted.get("notes", "")).strip()
+    raw_text = str(extracted.get("raw_text", "")).strip()
+
+    chunks = []
+    if section_lines:
+        chunks.append("\n\n".join(section_lines))
+    if notes and notes not in chunks:
+        chunks.append(notes)
+    if raw_text and raw_text not in chunks:
+        chunks.append(raw_text)
+
+    return "\n\n".join([c for c in chunks if c]).strip()
 
 
 # ---------------- Routes ----------------
@@ -288,6 +390,7 @@ def extract_notes():
 
             # ── Step 3: Adaptive enhancement + extraction ──
             extracted = extract_medical_notes_from_image(img, quality_report)
+            extracted["transcribed_text"] = _compose_transcribed_text(extracted)
 
             # ── Step 4: Multi-pass OCR for poor quality images ──
             if quality_report["overall_score"] < 60:
@@ -306,7 +409,8 @@ def extract_notes():
 
                         alt_response = GEMINI_MODEL.generate_content(
                             [alt_original, alt_img_pil,
-                             "Extract all text from this medical document as structured JSON. "
+                             "Extract and transcribe all visible text from this medical document as structured JSON. "
+                             "Do not comment on image quality. Use [?] only for unclear words. "
                              "Return ONLY valid JSON with keys: document_type, patient_info, "
                              "sections, investigations, diagnosis, prescription, notes."],
                             generation_config={
@@ -329,7 +433,16 @@ def extract_notes():
 
                 extracted = best_result
 
+            extracted["transcribed_text"] = _compose_transcribed_text(extracted)
+
             all_extracted_data = merge_day_data(all_extracted_data, extracted)
+
+        all_extracted_data["transcribed_text"] = _compose_transcribed_text(all_extracted_data)
+        if not all_extracted_data.get("sections") and all_extracted_data.get("transcribed_text"):
+            all_extracted_data["sections"] = [{
+                "title": "Transcribed Text",
+                "content": all_extracted_data["transcribed_text"],
+            }]
 
         log_audit(
             AuditAction.OCR_EXTRACT,
@@ -378,7 +491,7 @@ def save_notes():
         doc = {
             "patient_id": patient_id,
             "uploaded_at": datetime.utcnow().isoformat(),
-            "total_days_extracted": len(extracted_json.get("days", [])),
+            "sections_count": len(extracted_json.get("sections", [])),
             "data": extracted_json
         }
 
@@ -411,5 +524,6 @@ def get_notes(patient_id):
     )
 
     if not results:
-        return jsonify({"message": "No records found"}), 404
-    return jsonify(results)
+        return jsonify({"success": True, "notes": [], "count": 0})
+
+    return jsonify({"success": True, "notes": results, "count": len(results)})

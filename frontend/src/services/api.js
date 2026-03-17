@@ -85,7 +85,9 @@ export const consultantAPI = {
     const response = await axios.get(
       `${API_BASE_URL}/consultant/get_notes/${encodeURIComponent(patientId)}`
     );
-    return response.data;
+    if (Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response.data?.notes)) return response.data.notes;
+    return [];
   },
 };
 
