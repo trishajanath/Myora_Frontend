@@ -13,6 +13,7 @@ deepgram-sdk==3.2.0
 
 # Image processing (OCR preprocessing)
 Pillow>=10.0.0
+pytesseract>=0.3.10
 
 # HTTP client (OpenFDA API)
 requests>=2.31.0

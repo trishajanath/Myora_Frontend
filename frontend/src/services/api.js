@@ -91,6 +91,19 @@ export const consultantAPI = {
   },
 };
 
+export const ocrAPI = {
+  extract: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await axios.post(
+      `${API_BASE_URL}/ocr/extract`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+};
+
 export const auditAPI = {
   getLogs: async ({ patientId, action, limit } = {}) => {
     const params = new URLSearchParams();

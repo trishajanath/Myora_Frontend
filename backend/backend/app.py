@@ -23,11 +23,13 @@ from routes.patients import patients_bp
 from routes.voice_routes import voice_bp
 from routes.consultant_notes import consultant_bp
 from routes.drug_safety_routes import drug_safety_bp
+from routes.ocr_routes import ocr_bp
 
 app.register_blueprint(patients_bp, url_prefix="/api/patients")
 app.register_blueprint(voice_bp, url_prefix="/api/voice")
 app.register_blueprint(consultant_bp, url_prefix="/api/consultant")
 app.register_blueprint(drug_safety_bp, url_prefix="/api/drug-safety")
+app.register_blueprint(ocr_bp, url_prefix="/api/ocr")
 
 
 # Audit log viewer endpoint
@@ -65,7 +67,8 @@ def index():
         "endpoints": {
             "patients": "/api/patients",
             "voice": "/api/voice",
-            "consultant": "/api/consultant"
+            "consultant": "/api/consultant",
+            "ocr": "/api/ocr/extract"
         }
     })
 
@@ -98,6 +101,7 @@ if __name__ == "__main__":
     print(f"Save EMR: /api/voice/save")
     print(f"Consultant Notes: /api/consultant")
     print(f"Drug Safety: /api/drug-safety")
+    print(f"OCR (Tesseract): /api/ocr/extract")
     print("="*70)
     
     # Validate configuration

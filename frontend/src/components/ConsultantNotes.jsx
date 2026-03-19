@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { consultantAPI } from "../services/api";
+import { consultantAPI, ocrAPI } from "../services/api";
 import "./ConsultantNotes.css";
 
 export default function ConsultantNotes({ selectedPatient }) {
@@ -14,15 +14,68 @@ export default function ConsultantNotes({ selectedPatient }) {
   const [showHistory, setShowHistory] = useState(false);
   const [qualityReports, setQualityReports] = useState([]);
   const [regions, setRegions] = useState([]);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [tesseractResult, setTesseractResult] = useState(null);
 
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
     setFiles(selected);
     setPreviews(selected.map((f) => URL.createObjectURL(f)));
     setStructured(null);
+    setTesseractResult(null);
     setError("");
     setQualityReports([]);
     setRegions([]);
+  };
+
+  const handleTesseractExtract = async () => {
+    if (!files.length) return alert("Please select images first");
+
+    setOcrLoading(true);
+    setError("");
+
+    try {
+      const responses = await Promise.all(files.map((file) => ocrAPI.extract(file)));
+
+      const extractedParts = responses
+        .map((res) => {
+          const text = (res?.extracted_text || "").trim();
+          if (!text) return "";
+          return files.length > 1
+            ? `[${res.filename || "image"}]\n${text}`
+            : text;
+        })
+        .filter(Boolean);
+
+      const confidenceScores = responses
+        .map((res) => Number(res?.confidence_score || 0))
+        .filter((n) => !Number.isNaN(n));
+
+      const avgConfidence = confidenceScores.length
+        ? Math.round((confidenceScores.reduce((a, b) => a + b, 0) / confidenceScores.length) * 100) / 100
+        : 0;
+
+      const mergedMedicalFields = {};
+      responses.forEach((res) => {
+        const fields = res?.medical_fields || {};
+        Object.keys(fields).forEach((key) => {
+          if (!mergedMedicalFields[key]) {
+            mergedMedicalFields[key] = fields[key];
+          }
+        });
+      });
+
+      setTesseractResult({
+        text: extractedParts.join("\n\n"),
+        confidence: avgConfidence,
+        medicalFields: mergedMedicalFields,
+      });
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+      setTesseractResult(null);
+    } finally {
+      setOcrLoading(false);
+    }
   };
 
   const handleUpload = async () => {
@@ -212,6 +265,13 @@ export default function ConsultantNotes({ selectedPatient }) {
             >
               {extracting ? "Extracting..." : "Upload & Extract"}
             </button>
+            <button
+              className="primary-btn"
+              onClick={handleTesseractExtract}
+              disabled={!files.length || ocrLoading}
+            >
+              {ocrLoading ? "Running OCR..." : "Run Tesseract OCR"}
+            </button>
           </div>
 
           {/* Image Previews */}
@@ -231,6 +291,45 @@ export default function ConsultantNotes({ selectedPatient }) {
             <div className="extracting-indicator">
               <div className="spinner" />
               <span>AI is reading the document...</span>
+            </div>
+          )}
+
+          {ocrLoading && (
+            <div className="extracting-indicator">
+              <div className="spinner" />
+              <span>Tesseract is extracting text...</span>
+            </div>
+          )}
+
+          {tesseractResult && (
+            <div className="results-section">
+              <div className="results-header">
+                <h3>Tesseract OCR</h3>
+              </div>
+              <div className="ocr-result">
+                <div className="ocr-card highlight-blue">
+                  <h4>Transcribed Text</h4>
+                  <div className="section-content">
+                    {tesseractResult.text || "No text extracted."}
+                  </div>
+                </div>
+                <div className="ocr-card">
+                  <h4>Confidence</h4>
+                  <p>{tesseractResult.confidence}</p>
+                </div>
+                {Object.keys(tesseractResult.medicalFields || {}).length > 0 && (
+                  <div className="ocr-card highlight-green">
+                    <h4>Parsed Medical Fields</h4>
+                    <div className="section-content">
+                      {Object.entries(tesseractResult.medicalFields).map(([key, value]) => (
+                        <div key={key}>
+                          {key}: {value.value} {value.unit || ""}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
