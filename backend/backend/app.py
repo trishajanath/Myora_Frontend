@@ -24,12 +24,18 @@ from routes.voice_routes import voice_bp
 from routes.consultant_notes import consultant_bp
 from routes.drug_safety_routes import drug_safety_bp
 from routes.ocr_routes import ocr_bp
+from routes.prescription_routes import prescription_bp
+from routes.differential_routes import differential_bp
+from routes.discharge_routes import discharge_bp
 
 app.register_blueprint(patients_bp, url_prefix="/api/patients")
 app.register_blueprint(voice_bp, url_prefix="/api/voice")
 app.register_blueprint(consultant_bp, url_prefix="/api/consultant")
 app.register_blueprint(drug_safety_bp, url_prefix="/api/drug-safety")
 app.register_blueprint(ocr_bp, url_prefix="/api/ocr")
+app.register_blueprint(prescription_bp, url_prefix="/api/prescription")
+app.register_blueprint(differential_bp, url_prefix="/api/differential")
+app.register_blueprint(discharge_bp, url_prefix="/api/discharge")
 
 
 # Audit log viewer endpoint
@@ -102,6 +108,9 @@ if __name__ == "__main__":
     print(f"Consultant Notes: /api/consultant")
     print(f"Drug Safety: /api/drug-safety")
     print(f"OCR (Tesseract): /api/ocr/extract")
+    print(f"Prescription PDF: /api/prescription/generate")
+    print(f"Differential Dx: /api/differential/suggest")
+    print(f"Discharge Summary: /api/discharge/generate")
     print("="*70)
     
     # Validate configuration

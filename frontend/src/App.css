@@ -153,6 +153,7 @@
 .left-panel,
 .right-panel {
   min-height: 0;
+  overflow-y: auto;
 }
 
 @media (max-width: 1024px) {

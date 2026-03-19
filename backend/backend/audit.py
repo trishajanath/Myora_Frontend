@@ -50,6 +50,16 @@ class AuditAction:
     # Drug safety
     DRUG_SAFETY_CHECK = "DRUG_SAFETY_CHECK"
 
+    # Prescription
+    PRESCRIPTION_GENERATE = "PRESCRIPTION_GENERATE"
+
+    # Differential diagnosis
+    DIFFERENTIAL_DIAGNOSIS = "DIFFERENTIAL_DIAGNOSIS"
+
+    # Discharge summary
+    DISCHARGE_GENERATE = "DISCHARGE_GENERATE"
+    DISCHARGE_APPROVE = "DISCHARGE_APPROVE"
+
 
 def log_audit(action: str, patient_id: str = None, details: dict = None,
               user: str = "system", success: bool = True):

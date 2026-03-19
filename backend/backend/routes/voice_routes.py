@@ -20,7 +20,7 @@ voice_bp = Blueprint('voice', __name__)
 
 # Initialize clients
 genai.configure(api_key=Config.GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+gemini_model = genai.GenerativeModel("gemini-2.5-flash")
 deepgram = DeepgramClient(Config.DEEPGRAM_API_KEY) if DeepgramClient else None
 
 # -----------------------------

@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import "./VoiceRecorder.css";
+import { prescriptionAPI, differentialAPI } from "../services/api";
 
 function VoiceRecorder({ selectedPatient, onNoteSaved }) {
   const [isRecording, setIsRecording] = useState(false);
@@ -14,6 +15,9 @@ function VoiceRecorder({ selectedPatient, onNoteSaved }) {
   const [audioLevel, setAudioLevel] = useState(0);
   const [recordingTime, setRecordingTime] = useState(0);
   const [safetyReport, setSafetyReport] = useState(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [differentials, setDifferentials] = useState(null);
+  const [loadingDifferentials, setLoadingDifferentials] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -48,6 +52,7 @@ function VoiceRecorder({ selectedPatient, onNoteSaved }) {
       setConfidence(0);
       setRecordingTime(0);
       setSafetyReport(null);
+      setDifferentials(null);
       audioChunksRef.current = [];
       
       addLog(`Starting recording for ${selectedPatient.name}`, "success");
@@ -294,6 +299,7 @@ function VoiceRecorder({ selectedPatient, onNoteSaved }) {
       setConfidence(0);
       setRecordingTime(0);
       setSafetyReport(null);
+      setDifferentials(null);
       
       onNoteSaved?.();
     } catch (err) {
@@ -312,6 +318,73 @@ function VoiceRecorder({ selectedPatient, onNoteSaved }) {
     } catch (err) {
       addLog(`Backend not responding: ${err.message}`, "error");
       setStatus("Cannot connect to backend");
+    }
+  };
+
+  const generatePrescription = async () => {
+    if (!editedData || !selectedPatient) return;
+    const meds = editedData.Rx || editedData.rx || [];
+    if (!meds.length) {
+      addLog("No medications to generate prescription for", "error");
+      return;
+    }
+    setGeneratingPdf(true);
+    addLog("Generating prescription PDF...", "info");
+    try {
+      const blob = await prescriptionAPI.generate({
+        patient_name: selectedPatient.name,
+        patient_age: selectedPatient.age ? String(selectedPatient.age) : "",
+        patient_id: selectedPatient.id || "",
+        diagnosis: editedData.Diagnosis || "",
+        allergies: editedData.Allergy || [],
+        medications: meds,
+        advice: editedData.Advice_FollowUp || "",
+      });
+      const url = window.URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Rx_${selectedPatient.name}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      addLog("Prescription PDF downloaded", "success");
+    } catch (err) {
+      addLog(`Prescription error: ${err.message}`, "error");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const fetchDifferentialDiagnosis = async () => {
+    if (!editedData || !selectedPatient) return;
+    const complaints = editedData.Complaints_Presented || "";
+    if (complaints.length < 5) {
+      addLog("Complaints too short for differential diagnosis", "error");
+      return;
+    }
+    setLoadingDifferentials(true);
+    setDifferentials(null);
+    addLog("Requesting AI differential diagnosis...", "info");
+    try {
+      const result = await differentialAPI.suggest({
+        patient_id: selectedPatient.name,
+        complaints,
+        history: editedData.History || "",
+        allergies: editedData.Allergy || [],
+        age: selectedPatient.age ? String(selectedPatient.age) : "",
+        current_diagnosis: editedData.Diagnosis || "",
+      });
+      if (result.success) {
+        setDifferentials(result);
+        addLog(`Received ${result.differentials?.length || 0} differential suggestions`, "success");
+      } else {
+        addLog("Differential diagnosis failed", "error");
+      }
+    } catch (err) {
+      addLog(`Differential dx error: ${err.message}`, "error");
+    } finally {
+      setLoadingDifferentials(false);
     }
   };
 
@@ -495,9 +568,83 @@ function VoiceRecorder({ selectedPatient, onNoteSaved }) {
                 </pre>
               )}
 
-              <button onClick={saveToDatabase} className="save-record-btn">
-                Save to Patient Record
-              </button>
+              <div className="structured-actions">
+                <button onClick={saveToDatabase} className="save-record-btn">
+                  Save to Patient Record
+                </button>
+                <div className="structured-actions-row">
+                  <button
+                    onClick={generatePrescription}
+                    disabled={generatingPdf}
+                    className="prescription-btn"
+                  >
+                    {generatingPdf ? "Generating..." : "Prescription PDF"}
+                  </button>
+                  <button
+                    onClick={fetchDifferentialDiagnosis}
+                    disabled={loadingDifferentials}
+                    className="differential-btn"
+                  >
+                    {loadingDifferentials ? "Analyzing..." : "Differential Dx"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Differential Diagnosis Panel */}
+          {differentials && differentials.differentials && (
+            <div className="differential-section">
+              <div className="differential-header">
+                <div>
+                  <h3>Differential Diagnosis</h3>
+                  <p>Clinical decision support</p>
+                </div>
+                <button
+                  className="differential-close"
+                  onClick={() => setDifferentials(null)}
+                >
+                  Dismiss
+                </button>
+              </div>
+
+              <div className="differential-body-scroll">
+                {differentials.red_flags && differentials.red_flags.length > 0 && (
+                  <div className="dx-red-flags">
+                    <span className="dx-red-label">Red Flags</span>
+                    {differentials.red_flags.map((flag, i) => (
+                      <span key={i} className="dx-red-item">{flag}</span>
+                    ))}
+                  </div>
+                )}
+
+                {differentials.agreement_with_current && (
+                  <div className="dx-assessment">
+                    {differentials.agreement_with_current}
+                  </div>
+                )}
+
+                {differentials.differentials.map((dx, idx) => (
+                  <div key={idx} className="dx-row">
+                    <div className="dx-rank-col">
+                      <span className={`dx-dot dx-dot--${dx.likelihood}`} />
+                      <span className="dx-rank-num">{dx.rank}</span>
+                    </div>
+                    <div className="dx-content">
+                      <div className="dx-title-row">
+                        <span className="dx-name">{dx.diagnosis}</span>
+                        <span className={`dx-badge dx-badge--${dx.likelihood}`}>{dx.likelihood}</span>
+                      </div>
+                      <p className="dx-reason">{dx.reasoning}</p>
+                      <p className="dx-next">Next -- {dx.next_step}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="dx-footer">
+                {differentials.note}
+              </div>
             </div>
           )}
         </>

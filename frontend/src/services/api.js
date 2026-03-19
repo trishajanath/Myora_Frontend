@@ -128,3 +128,50 @@ export const drugSafetyAPI = {
     return response.data;
   },
 };
+
+export const prescriptionAPI = {
+  generate: async ({ patient_name, patient_age, patient_id, diagnosis, allergies, medications, advice, doctor_name }) => {
+    const response = await axios.post(
+      `${API_BASE_URL}/prescription/generate`,
+      { patient_name, patient_age, patient_id, diagnosis, allergies, medications, advice, doctor_name },
+      { responseType: 'blob' }
+    );
+    return response.data;
+  },
+};
+
+export const differentialAPI = {
+  suggest: async ({ patient_id, complaints, history, allergies, vitals, age, current_diagnosis }) => {
+    const response = await axios.post(`${API_BASE_URL}/differential/suggest`, {
+      patient_id,
+      complaints,
+      history,
+      allergies,
+      vitals,
+      age,
+      current_diagnosis,
+    });
+    return response.data;
+  },
+};
+
+export const dischargeAPI = {
+  generate: async ({ patient_id, patient_name, patient_age }) => {
+    const response = await axios.post(`${API_BASE_URL}/discharge/generate`, {
+      patient_id,
+      patient_name,
+      patient_age,
+    });
+    return response.data;
+  },
+
+  approve: async ({ patient_id, patient_name, summary, approved_by }) => {
+    const response = await axios.post(`${API_BASE_URL}/discharge/approve`, {
+      patient_id,
+      patient_name,
+      summary,
+      approved_by,
+    });
+    return response.data;
+  },
+};

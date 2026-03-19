@@ -6,6 +6,7 @@ import AddPatientModal from './components/AddPatientModal';
 import VoiceRecorder from './components/VoiceRecorder';
 import ConsultantNotes from './components/ConsultantNotes';
 import AuditLog from './components/AuditLog';
+import DischargeSummary from './components/DischargeSummary';
 import { patientAPI } from './services/api';
 
 function App() {
@@ -125,6 +126,12 @@ function App() {
           Documents
         </button>
         <button
+          className={`tab-btn ${activeTab === 'discharge' ? 'active' : ''}`}
+          onClick={() => setActiveTab('discharge')}
+        >
+          Discharge Summary
+        </button>
+        <button
           className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}
           onClick={() => setActiveTab('audit')}
         >
@@ -187,6 +194,22 @@ function App() {
                 </div>
                 <div className="right-panel">
                   <ConsultantNotes selectedPatient={selectedPatient} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'discharge' && (
+              <div className="voice-view">
+                <div className="left-panel">
+                  <PatientList
+                    patients={patients}
+                    onSelectPatient={setSelectedPatient}
+                    onDeletePatient={handleDeletePatient}
+                    onEditPatient={openEditModal}
+                  />
+                </div>
+                <div className="right-panel">
+                  <DischargeSummary selectedPatient={selectedPatient} />
                 </div>
               </div>
             )}
