@@ -58,6 +58,42 @@ def clean_json_response(response_text: str):
     return json_str
 
 
+def normalize_sections(data: dict) -> dict:
+    """Normalize sections field to ensure it's a list of dictionaries with title/content keys."""
+    if not data or "sections" not in data:
+        return data
+    
+    sections = data.get("sections", [])
+    
+    # If sections is not a list, convert it
+    if not isinstance(sections, list):
+        if isinstance(sections, str):
+            # If it's a string, create a single section
+            sections = [{"title": "Content", "content": sections}]
+        else:
+            sections = []
+    
+    # Normalize each section to have title and content keys
+    normalized = []
+    for sec in sections:
+        if isinstance(sec, dict):
+            # Ensure it has title and content keys
+            normalized.append({
+                "title": sec.get("title", ""),
+                "content": sec.get("content", "")
+            })
+        elif isinstance(sec, str):
+            # Convert string to dict
+            normalized.append({
+                "title": "",
+                "content": sec
+            })
+        # Skip non-dict, non-string items
+    
+    data["sections"] = normalized
+    return data
+
+
 def preprocess_image(img: Image.Image) -> Image.Image:
     """Enhance image for better handwriting recognition."""
     # Auto-orient based on EXIF data
@@ -279,6 +315,10 @@ Return ONLY the JSON, no explanations."""
                 return {"document_type": "unknown", "sections": [], "raw_text": response.text if response else ""}
 
         parsed = json.loads(cleaned_json)
+        
+        # Normalize sections to ensure proper structure
+        parsed = normalize_sections(parsed)
+        
         if not parsed.get("sections"):
             fallback_text = extract_plain_text_fallback()
             if fallback_text:
@@ -422,6 +462,8 @@ def extract_notes():
                             alt_json = clean_json_response(alt_response.text)
                             if alt_json:
                                 alt_data = json.loads(alt_json)
+                                # Normalize sections in alternative data
+                                alt_data = normalize_sections(alt_data)
                                 alt_sections = len(alt_data.get("sections", []))
                                 if alt_sections > best_section_count:
                                     best_result = alt_data
@@ -437,6 +479,8 @@ def extract_notes():
 
             all_extracted_data = merge_day_data(all_extracted_data, extracted)
 
+        # Normalize final data before composing transcribed text
+        all_extracted_data = normalize_sections(all_extracted_data)
         all_extracted_data["transcribed_text"] = _compose_transcribed_text(all_extracted_data)
         if not all_extracted_data.get("sections") and all_extracted_data.get("transcribed_text"):
             all_extracted_data["sections"] = [{
